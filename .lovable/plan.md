@@ -1,87 +1,38 @@
 
 
-## Assumptions Tab Rebuild
+## A/R Schedule Tab Rebuild (final)
 
-Replace the current Assumptions page with a fully grouped, spec-driven editor: 9 sections, ~35 editable rows, an auto-summed Opening Cash Balance, visual flags (yellow estimate / red threshold), a sticky info banner, and inline notes. Auto-save on blur is preserved.
+Same as the prior approved plan, with this single correction:
 
-### 1. Database — reseed + new keys
+### Toggle behavior fix
 
-A migration will reseed `assumptions` with the exact rows from the spec, keyed for engine consumption.
+- The **"Use probability-weighted"** toggle controls the **summary strip display only**.
+- **Apply to Model always sends probability-weighted amounts** (`amount × probability%`) to the forecast engine, regardless of the toggle state.
+- A small muted note is shown next to the toggle: *"Display toggle only — model always uses probability-weighted amounts."*
 
-New / changed keys:
+### Everything else unchanged
 
-- **Cash accounts (new, category `Opening Cash`)**: `cash_svb_mm` 51,428,680 · `cash_brex_treasury` 5,163,683 · `cash_brex_primary` 1,040,168 · `cash_svb_checking` 250,000 · `cash_stripe_clearing` 65,667. The legacy `opening_cash_balance` row is removed; the engine will sum these five.
-- **Inflows**: `stripe_daily_rate` 64,990 · `stripe_growth_pct` 3 · `enterprise_ach_weekly` 344,060.
-- **Payroll**: `payroll_semi_monthly` 659,000 · `payroll_processing_fee` 1,500 (new — added to each payroll-week outflow).
-- **AI COGS**: `cogs_anthropic` 386,722 · `cogs_azure` 278,221 · `cogs_openai` 252,688 · `cogs_elevenlabs` 111,829 · `cogs_deepgram` 277,843 · `cogs_pump_aws` 374,471 · `cogs_twilio` 140,000 · `cogs_other` 96,000. Anthropic/Azure notes capture the 7% growth (engine applies it monthly the same way Stripe does — see §3).
-- **Brex Card (new, category `Brex Card`)**: `brex_w2` 540,000 · `brex_w7` 551,000 · `brex_w11` 562,000. The hardcoded constants in `forecast.ts` are removed and these assumptions drive the model. All three flagged yellow.
-- **OpEx**: `opex_sm` 720,000 · `opex_software` 55,000 · `opex_legal` 220,403 · `opex_deel` 231,870 · `opex_hr_te` 73,552 · `opex_recruiting` 165,000 (yellow) · `opex_ga` 75,000. `rent_may_sep` 32,417 · `rent_oct_plus` 64,835 stay in category `Rent`.
-- **One-Time**: rename `one_time_w2` → `one_time_vendor_w2` 460,000 (yellow, note "vendor TBD"). The forecast engine reads the new key (engine update below).
-- **Cash Threshold**: `min_cash_threshold` 15,000,000 (red border).
-- **A/R Delay**: `ar_delay_days` 0.
+**Part 1 — Inline invoice table**
+Editable grid: Customer · Invoice # · Amount · Aging Days (computed) · Probability % (auto from bucket, override stored as `__prob_override:NN` in `notes`) · Expected Week (1–13 dropdown, persisted via `expected_collection_date`) · Notes · Delete. Add row button. Auto-save on blur via existing `useUpsertArEntry`. Footer shows total amount + total probability-weighted collections.
 
-A short `flag` column is **not** added — flags are derived in the UI from a static key→flag map (`yellow` / `red`). No schema column changes needed beyond the row reseed.
+**Part 2 — CSV upload**
+Drag-and-drop dropzone above the table. Hand-written CSV parser (no new deps) tolerant to QuickBooks A/R Aging Summary headers (`Customer`/`Customer Name`, `Invoice Amount`/`Amount`/`Open Balance`, `Aging Days`/`Days Past Due`, optional `Due Date`, `Invoice #`/`Num`). Auto-fill probability and expected week per aging bucket (0–30 → W1–W2 round-robin, 31–60 → W3–W5, 61–90 → W6–W8, 90+ → W9–W10). Preview modal with row checkboxes + editable expected week before commit.
 
-### 2. Forecast engine update (`src/lib/forecast.ts`)
+**Part 3 — Weekly SUMIF strip + Apply to Model**
+13-column footer strip showing per-week totals, shifted by `ROUND(ar_delay_days/7, 0)` from Assumptions. Toggle switches the strip between weighted and raw display. **Apply to Model** button always writes probability-weighted weeks to a new `ar_weekly_overrides` table; forecast engine reads the latest override for the current forecast start and uses it for the A/R Collections row, falling back to per-invoice bucketing if no override exists.
 
-Small adjustments to consume the new keys:
+### Files
 
-- `opening` = sum of the five `cash_*` keys (fallback to legacy `opening_cash_balance` if present, for safety on first run).
-- Brex weeks read from `brex_w2`, `brex_w7`, `brex_w11` instead of the hardcoded constants.
-- Payroll weeks add `payroll_processing_fee` once per payroll-week.
-- Anthropic & Azure apply `(1 + 0.07)^monthIndex` to their monthly base (matches "7% growth" note). Other COGS vendors stay flat.
-- `one_time_w2` lookup falls back to `one_time_vendor_w2`.
-
-These changes are internal to the engine; the existing grid keeps working.
-
-### 3. UI — `src/pages/Assumptions.tsx`
-
-Replace the current category-grouped Cards with a hand-ordered section list driven by a static config. Each section has a title, optional subtitle, and rows.
-
-**Top banner** (sticky-ish at top, blue/info style):
-
-> Changes here take effect when you click **Generate Forecast** on the Dashboard.
-
-**Section structure** (one Card per section):
-
-1. **Opening Cash Balance (as of Apr 20, 2026)** — 5 editable rows + auto-summed read-only **TOTAL** row at bottom (bold, computed live from the 5 input states, not from DB). Total updates as user types so they get instant feedback before blur.
-2. **Inflows** — stripe daily, growth %, enterprise ACH weekly.
-3. **Payroll** — semi-monthly base, processing fee.
-4. **AI COGS Vendors** — 8 rows; Anthropic/Azure show "(monthly base, 7% growth)" subtitle; Deepgram shows "one payment Apr 30 only".
-5. **Brex Card Payments** — 3 rows, all yellow-flagged with a section subtitle "Estimates".
-6. **Operating Expenses** — 9 rows including the two rent regimes; Recruiting flagged yellow; S&M shows the Montgomery Entertainment note.
-7. **One-Time Payments** — single row, yellow, note "vendor TBD".
-8. **Cash Threshold / Alert** — `min_cash_threshold` rendered with red border on the input.
-9. **A/R Collection Delay Scenario** — `ar_delay_days` with helper note about ROUND(days/7).
-
-**Row component (`AssumptionRow`)**:
-
-- Label (left), inline notes (small muted text under label).
-- Number input (right, `tabular-nums`, width 200px).
-- `flag` prop: `yellow` adds `bg-estimate-yellow/40 border-estimate-yellow` to the input; `red` adds `border-warn-amber border-2`. Blue editable highlight (`bg-input-blue/30`) is the default.
-- Auto-save on blur via existing `useUpdateAssumption` mutation; no save on every keystroke. Pressing Enter blurs.
-- Skips save if value unchanged or NaN (existing logic).
-
-**Auto-summed total row** for section 1: a non-editable row that reads the five local input states, sums them, and renders bold with `$` formatting via `formatCurrency`.
-
-### 4. Section config (single source of truth)
-
-A `const SECTIONS` array in `Assumptions.tsx` defines: `{ id, title, subtitle?, rows: [{ key, flag? }] }`. The page maps DB rows by `key` and renders strictly in this order, ignoring DB sort. Any DB row whose key isn't in the config is hidden (clean slate), which is fine because the migration reseeds the table.
-
-### 5. Files touched
-
-- `supabase/migrations/<new>.sql` — `DELETE FROM assumptions;` then `INSERT` all rows above with category, key, label, value, unit, notes.
-- `src/lib/forecast.ts` — opening-cash sum, Brex-from-assumptions, payroll fee, Anthropic/Azure growth, key fallback.
-- `src/pages/Assumptions.tsx` — full rewrite per UI spec above.
-- `src/hooks/useFinanceData.ts` — no change (existing `useAssumptions` / `useUpdateAssumption` are sufficient).
-- `src/index.css` — no change (existing `--input-blue`, `--estimate-yellow`, `--warn-amber` tokens are reused).
+- New migration: `ar_weekly_overrides` table (id, forecast_start, delay_days, weeks jsonb, created_by, created_at) with authenticated RLS.
+- `src/hooks/useFinanceData.ts` — add `useArWeeklyOverride`, `useApplyArOverride`.
+- `src/lib/forecast.ts` — accept optional `arOverride` and use its `weeks[]` when present.
+- `src/pages/Dashboard.tsx` — pass latest override to `buildForecast`.
+- `src/pages/ArSchedule.tsx` — full rewrite.
+- New: `src/lib/parseArCsv.ts`, `src/components/ar/ArInlineRow.tsx`, `src/components/ar/CsvDropzone.tsx`, `src/components/ar/CsvPreviewDialog.tsx`, `src/components/ar/WeeklySummaryStrip.tsx`.
 
 ### Acceptance
 
-- Page renders 9 sections in the order above with the exact labels and default values from the spec.
-- Editing any input and blurring saves to Supabase and shows the existing "Assumption updated" toast.
-- Opening Cash Balance section shows a live-updating bold TOTAL row (initially 57,948,198).
-- Yellow-flagged rows have a yellow-tinted input; min-cash row has a red border.
-- Banner is visible at the top of the page.
-- Dashboard's Generate Forecast continues to work and now reflects the new Brex / payroll-fee / Anthropic-growth logic.
+- Toggle changes the strip's visible numbers but never changes what Apply to Model writes.
+- Disclaimer text is visible next to the toggle.
+- All other behaviors (inline edit, CSV import preview, delay shift, override-driven Dashboard A/R row) work as in the prior plan.
 
