@@ -56,6 +56,33 @@ export type Database = {
         }
         Relationships: []
       }
+      ar_weekly_overrides: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          delay_days: number
+          forecast_start: string
+          id: string
+          weeks: Json
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          delay_days?: number
+          forecast_start: string
+          id?: string
+          weeks: Json
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          delay_days?: number
+          forecast_start?: string
+          id?: string
+          weeks?: Json
+        }
+        Relationships: []
+      }
       assumptions: {
         Row: {
           category: string
