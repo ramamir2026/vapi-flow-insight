@@ -14,16 +14,289 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      ar_entries: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          customer_name: string
+          expected_collection_date: string
+          id: string
+          invoice_amount: number
+          invoice_date: string
+          invoice_number: string | null
+          notes: string | null
+          status: Database["public"]["Enums"]["ar_status"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          customer_name: string
+          expected_collection_date: string
+          id?: string
+          invoice_amount?: number
+          invoice_date: string
+          invoice_number?: string | null
+          notes?: string | null
+          status?: Database["public"]["Enums"]["ar_status"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          customer_name?: string
+          expected_collection_date?: string
+          id?: string
+          invoice_amount?: number
+          invoice_date?: string
+          invoice_number?: string | null
+          notes?: string | null
+          status?: Database["public"]["Enums"]["ar_status"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      assumptions: {
+        Row: {
+          category: string
+          created_at: string
+          id: string
+          key: string
+          label: string
+          notes: string | null
+          unit: string | null
+          updated_at: string
+          value: number
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          id?: string
+          key: string
+          label: string
+          notes?: string | null
+          unit?: string | null
+          updated_at?: string
+          value?: number
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          id?: string
+          key?: string
+          label?: string
+          notes?: string | null
+          unit?: string | null
+          updated_at?: string
+          value?: number
+        }
+        Relationships: []
+      }
+      future_hires: {
+        Row: {
+          annual_salary: number
+          created_at: string
+          created_by: string | null
+          department: string | null
+          id: string
+          name: string
+          notes: string | null
+          role: string
+          start_date: string
+          updated_at: string
+        }
+        Insert: {
+          annual_salary?: number
+          created_at?: string
+          created_by?: string | null
+          department?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          role: string
+          start_date: string
+          updated_at?: string
+        }
+        Update: {
+          annual_salary?: number
+          created_at?: string
+          created_by?: string | null
+          department?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          role?: string
+          start_date?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      model_weeks: {
+        Row: {
+          ar_collections: number
+          burn: number
+          card_payments: number
+          closing_balance: number
+          cogs: number
+          created_at: string
+          created_by: string | null
+          enterprise_revenue: number
+          id: string
+          net_change: number
+          opening_balance: number
+          opex: number
+          payroll: number
+          rent: number
+          runway_weeks: number | null
+          snapshot_id: string
+          snapshot_label: string | null
+          stripe_revenue: number
+          week_index: number
+          week_start_date: string
+        }
+        Insert: {
+          ar_collections?: number
+          burn?: number
+          card_payments?: number
+          closing_balance?: number
+          cogs?: number
+          created_at?: string
+          created_by?: string | null
+          enterprise_revenue?: number
+          id?: string
+          net_change?: number
+          opening_balance?: number
+          opex?: number
+          payroll?: number
+          rent?: number
+          runway_weeks?: number | null
+          snapshot_id: string
+          snapshot_label?: string | null
+          stripe_revenue?: number
+          week_index: number
+          week_start_date: string
+        }
+        Update: {
+          ar_collections?: number
+          burn?: number
+          card_payments?: number
+          closing_balance?: number
+          cogs?: number
+          created_at?: string
+          created_by?: string | null
+          enterprise_revenue?: number
+          id?: string
+          net_change?: number
+          opening_balance?: number
+          opex?: number
+          payroll?: number
+          rent?: number
+          runway_weeks?: number | null
+          snapshot_id?: string
+          snapshot_label?: string | null
+          stripe_revenue?: number
+          week_index?: number
+          week_start_date?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string
+          full_name: string | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      weekly_actuals: {
+        Row: {
+          actual_burn: number | null
+          closing_cash_balance: number
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          updated_at: string
+          week_start_date: string
+        }
+        Insert: {
+          actual_burn?: number | null
+          closing_cash_balance?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          updated_at?: string
+          week_start_date: string
+        }
+        Update: {
+          actual_burn?: number | null
+          closing_cash_balance?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          updated_at?: string
+          week_start_date?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user"
+      ar_status: "pending" | "collected" | "overdue" | "written_off"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +423,9 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "user"],
+      ar_status: ["pending", "collected", "overdue", "written_off"],
+    },
   },
 } as const
