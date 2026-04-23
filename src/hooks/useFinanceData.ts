@@ -163,6 +163,69 @@ export const useDeleteHire = () => {
   });
 };
 
+// ============ A/R weekly overrides ============
+export type ArWeeklyOverride = {
+  id: string;
+  forecast_start: string;
+  delay_days: number;
+  weeks: number[];
+  created_at: string;
+};
+
+const currentForecastStartISO = () => {
+  const d = new Date();
+  const day = d.getDay();
+  const diff = (day + 6) % 7;
+  const monday = new Date(d);
+  monday.setDate(d.getDate() - diff);
+  return monday.toISOString().slice(0, 10);
+};
+
+export const useArWeeklyOverride = () =>
+  useQuery({
+    queryKey: ["ar_weekly_overrides", currentForecastStartISO()],
+    queryFn: async () => {
+      const start = currentForecastStartISO();
+      const { data, error } = await supabase
+        .from("ar_weekly_overrides")
+        .select("*")
+        .eq("forecast_start", start)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return null;
+      return {
+        id: data.id,
+        forecast_start: data.forecast_start,
+        delay_days: data.delay_days,
+        weeks: (data.weeks as unknown as number[]) ?? new Array(13).fill(0),
+        created_at: data.created_at,
+      } as ArWeeklyOverride;
+    },
+  });
+
+export const useApplyArOverride = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ weeks, delayDays }: { weeks: number[]; delayDays: number }) => {
+      const start = currentForecastStartISO();
+      const { error } = await supabase.from("ar_weekly_overrides").insert({
+        forecast_start: start,
+        delay_days: delayDays,
+        weeks: weeks as any,
+      } as any);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["ar_weekly_overrides"] });
+      qc.invalidateQueries({ queryKey: ["ar_entries"] });
+      toast.success("Applied to model");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+};
+
 // ============ Forecast snapshot ============
 export type ForecastSnapshotWeek = {
   week_index: number;
