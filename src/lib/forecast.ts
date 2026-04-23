@@ -117,9 +117,10 @@ const OPEX_LABELS: Record<string, string> = {
   opex_ga: "G&A",
 };
 
-const BREX_BY_WEEK: Record<number, number> = { 2: 540000, 7: 551000, 11: 562000 };
-
 const PAYROLL_WEEKS = new Set([2, 4, 6, 8, 10, 12]);
+
+const COGS_GROWTH_KEYS = new Set(["cogs_anthropic", "cogs_azure"]);
+const COGS_MONTHLY_GROWTH = 0.07;
 
 const WEEKS_PER_MONTH = 4.333;
 
