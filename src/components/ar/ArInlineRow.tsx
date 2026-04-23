@@ -131,7 +131,7 @@ export const ArInlineRow = ({
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entry?.id, entry?.updated_at]);
+  }, [entry?.id]);
 
   const aging = agingDays(draft.invoice_date);
   const autoProb = Math.round(probabilityForAging(aging) * 100);
