@@ -133,7 +133,16 @@ export const buildForecast = (
 ): ForecastResult => {
   const start = startOfWeek(startDate ?? new Date(), { weekStartsOn: 1 });
 
-  const opening = assumptions["opening_cash_balance"] ?? 0;
+  // Opening cash = sum of cash_* accounts; fallback to legacy single key
+  const cashKeys = [
+    "cash_svb_mm",
+    "cash_brex_treasury",
+    "cash_brex_primary",
+    "cash_svb_checking",
+    "cash_stripe_clearing",
+  ];
+  const cashSum = cashKeys.reduce((s, k) => s + (assumptions[k] ?? 0), 0);
+  const opening = cashSum > 0 ? cashSum : assumptions["opening_cash_balance"] ?? 0;
   const minCashThreshold = assumptions["min_cash_threshold"] ?? 15_000_000;
 
   const stripeDaily = assumptions["stripe_daily_rate"] ?? 0;
@@ -144,10 +153,17 @@ export const buildForecast = (
   const arDelayWeeks = Math.round(arDelayDays / 7);
 
   const payrollSemi = assumptions["payroll_semi_monthly"] ?? 0;
-  const oneTimeW2 = assumptions["one_time_w2"] ?? 0;
+  const payrollFee = assumptions["payroll_processing_fee"] ?? 0;
+  const oneTimeW2 = assumptions["one_time_vendor_w2"] ?? assumptions["one_time_w2"] ?? 0;
 
   const rentMaySep = assumptions["rent_may_sep"] ?? 0;
   const rentOctPlus = assumptions["rent_oct_plus"] ?? 0;
+
+  const brexByWeek: Record<number, number> = {
+    2: assumptions["brex_w2"] ?? 0,
+    7: assumptions["brex_w7"] ?? 0,
+    11: assumptions["brex_w11"] ?? 0,
+  };
 
   // Pre-compute week start dates
   const weekStartDates: Date[] = [];
