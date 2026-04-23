@@ -8,6 +8,7 @@ import {
   useArWeeklyOverride,
   useAssumptions,
   useFutureHires,
+  useHirePayrollOverride,
   useSaveForecastSnapshot,
   useUpdateWeeklyActual,
   useWeeklyActuals,
