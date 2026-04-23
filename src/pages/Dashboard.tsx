@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowDownRight, ArrowUpRight, Calendar, Download, Flame, RefreshCw, Wallet } from "lucide-react";
 import {
   useArEntries,
+  useArWeeklyOverride,
   useAssumptions,
   useFutureHires,
   useSaveForecastSnapshot,
@@ -58,6 +59,7 @@ export default function Dashboard() {
   const { data: arEntries, isLoading: arLoading } = useArEntries();
   const { data: hires, isLoading: hLoading } = useFutureHires();
   const { data: actualsData } = useWeeklyActuals();
+  const { data: arOverride } = useArWeeklyOverride();
   const updateActual = useUpdateWeeklyActual();
   const saveSnapshot = useSaveForecastSnapshot();
 
@@ -76,9 +78,12 @@ export default function Dashboard() {
       hires?.map((h) => ({
         start_date: h.start_date,
         annual_salary: Number(h.annual_salary),
-      })) ?? []
+      })) ?? [],
+      13,
+      undefined,
+      arOverride ? { weeks: arOverride.weeks, delay_days: arOverride.delay_days } : null
     );
-  }, [assumptions, arEntries, hires]);
+  }, [assumptions, arEntries, hires, arOverride]);
 
   if (loading || !forecast) {
     return (

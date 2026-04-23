@@ -124,12 +124,18 @@ const COGS_MONTHLY_GROWTH = 0.07;
 
 const WEEKS_PER_MONTH = 4.333;
 
+export interface ArOverride {
+  weeks: number[]; // length = weeksCount, probability-weighted totals already shifted
+  delay_days: number;
+}
+
 export const buildForecast = (
   assumptions: AssumptionMap,
   arEntries: ARForecastEntry[],
   hires: HireForecastEntry[],
   weeksCount = 13,
-  startDate?: Date
+  startDate?: Date,
+  arOverride?: ArOverride | null
 ): ForecastResult => {
   const start = startOfWeek(startDate ?? new Date(), { weekStartsOn: 1 });
 
@@ -223,13 +229,21 @@ export const buildForecast = (
   }
 
   // ============ A/R collections per week ============
-  const arPerWeek = new Array(weeksCount).fill(0);
-  for (const e of arEntries) {
-    if (e.status === "written_off" || e.status === "collected") continue;
-    const expected = addDays(new Date(e.expected_collection_date), arDelayWeeks * 7);
-    const expectedWeekStart = startOfWeek(expected, { weekStartsOn: 1 });
-    const idx = Math.round((expectedWeekStart.getTime() - start.getTime()) / (7 * 86400000));
-    if (idx >= 0 && idx < weeksCount) arPerWeek[idx] += Number(e.invoice_amount);
+  let arPerWeek: number[];
+  if (arOverride && Array.isArray(arOverride.weeks) && arOverride.weeks.length > 0) {
+    arPerWeek = new Array(weeksCount).fill(0);
+    for (let i = 0; i < weeksCount; i++) {
+      arPerWeek[i] = Number(arOverride.weeks[i]) || 0;
+    }
+  } else {
+    arPerWeek = new Array(weeksCount).fill(0);
+    for (const e of arEntries) {
+      if (e.status === "written_off" || e.status === "collected") continue;
+      const expected = addDays(new Date(e.expected_collection_date), arDelayWeeks * 7);
+      const expectedWeekStart = startOfWeek(expected, { weekStartsOn: 1 });
+      const idx = Math.round((expectedWeekStart.getTime() - start.getTime()) / (7 * 86400000));
+      if (idx >= 0 && idx < weeksCount) arPerWeek[idx] += Number(e.invoice_amount);
+    }
   }
 
   // ============ Per-week assembly ============
