@@ -1,147 +1,75 @@
-## Future Hires Tab Rebuild
 
-Replace the current dialog-based hires page with a spreadsheet-style hire table, CSV importer, and a 6-period payroll impact grid that snapshots into the forecast model.
 
-### 1. Database changes
+## COSO Internal Controls & Audit Trail
 
-**Migration** — add `status` to `future_hires` and create `hire_payroll_overrides` snapshot table.
+End-to-end controls layer: append-only audit log via DB triggers, role-based permissions (viewer/editor/approver), week sign-offs, import-lock with approver override, an Audit Log page, and audit context surfaced throughout the UI.
 
-```sql
--- Add status enum + column
-CREATE TYPE public.hire_status AS ENUM ('confirmed', 'offer_sent', 'interviewing');
+### 1. Database
 
-ALTER TABLE public.future_hires
-  ADD COLUMN status public.hire_status NOT NULL DEFAULT 'interviewing';
+**Migration: `audit_log` (append-only)**
+- Columns: `id uuid pk`, `user_email text`, `action text` (insert/update/delete/approve/import/override), `table_name text`, `row_id uuid`, `field_name text`, `old_value text`, `new_value text`, `source text` (manual/import/approver_override), `import_filename text`, `created_at timestamptz default now()`.
+- RLS: SELECT for authenticated; **INSERT only via security-definer trigger functions**; **no UPDATE policy, no DELETE policy** → effectively append-only.
+- Index: `(table_name, row_id)`, `(created_at desc)`, `(user_email)`.
 
--- Snapshot table for payroll-impact totals applied to the forecast
-CREATE TABLE public.hire_payroll_overrides (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  forecast_start date NOT NULL,
-  periods jsonb NOT NULL,        -- [{ key:'P1', total:number }, ...]  length 6
-  weeks jsonb NOT NULL,          -- length 13, totals mapped to W2/4/6/8/10/12
-  created_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
-  created_at timestamptz NOT NULL DEFAULT now()
-);
-ALTER TABLE public.hire_payroll_overrides ENABLE ROW LEVEL SECURITY;
--- authenticated full access policies (mirrors ar_weekly_overrides)
-CREATE INDEX idx_hire_payroll_overrides_forecast_start
-  ON public.hire_payroll_overrides(forecast_start DESC, created_at DESC);
-```
+**Trigger function `public.log_audit()`**
+- `SECURITY DEFINER`, captures `auth.jwt()->>'email'`, diffs OLD vs NEW per column, writes one row per changed field on UPDATE, one row on INSERT/DELETE. Reads `current_setting('app.source', true)` to tag `source` and `import_filename` (defaults to `manual`).
+- Attached as `AFTER INSERT/UPDATE/DELETE` on: `assumptions`, `ar_entries`, `future_hires`, `weekly_actuals`, `model_weeks`.
 
-The `periods` JSON is the per-hire detail (kept for traceability); `weeks` is what the forecast engine consumes.
+**Migration: extend `user_roles`** (already exists with admin/user)
+- Add new enum values to `app_role`: `viewer`, `editor`, `approver`.
+- Seed `ram@vapi.ai` as `approver` (and keep existing `user` rows as `editor` by default via a one-time UPDATE).
+- Helper SQL function `current_user_role()` returning highest role for `auth.uid()`.
 
-### 2. Forecast engine update (`src/lib/forecast.ts`)
+**Migration: `week_signoffs`**
+- Columns: `id uuid pk`, `week_start_date date unique`, `approved_by_email text`, `approved_by_user_id uuid`, `approved_at timestamptz default now()`, `note text`.
+- RLS: SELECT all authenticated; INSERT/DELETE only when `has_role(auth.uid(),'approver')`.
 
-- Add optional `hireOverride?: { weeks: number[] }` parameter to `buildForecast`.
-- Inside the per-week assembly, replace the existing `activeHires.reduce(...)` add-on (which currently uses `annual_salary / 24` on every payroll week) with **either**:
-  - `hireOverride.weeks[i]` when provided (preferred, this is the precomputed period total), or
-  - existing legacy fallback for backwards compatibility.
-- Mapping is already correct: payroll weeks are W2/4/6/8/10/12 (1-indexed), which match P1–P6. The `weeks[]` array passed in will only have non-zero values at those indices.
+**Migration: import metadata on row tables**
+- Add columns to `ar_entries`, `future_hires`, `weekly_actuals`: `source text default 'manual'`, `import_filename text`, `import_locked boolean default false`.
+- Add columns to backfill: existing rows stay `manual`/unlocked.
 
-### 3. Data hooks (`src/hooks/useFinanceData.ts`)
+### 2. Hooks & client plumbing (`src/hooks/useFinanceData.ts` + new files)
 
-- Extend `FutureHire` type with `status: 'confirmed' | 'offer_sent' | 'interviewing'`.
-- Add `useHirePayrollOverride()` — fetches latest snapshot for current forecast Monday (mirrors `useArWeeklyOverride`).
-- Add `useApplyHirePayrollOverride()` — inserts the snapshot row.
+- `useCurrentRole()` — selects the user's role from `user_roles` joined to `profiles.email`. Returns `'viewer' | 'editor' | 'approver'`.
+- `useWeekSignoffs()` + `useSignOffWeek()` + `useUnsignWeek()` (approver-only).
+- `useAuditLog({ filters })` — paginated query for the Audit Log page.
+- `useLastUpdatedByWeek()` — groups latest audit_log rows by `week_start_date` (derived from row → week) for the per-column "Updated by" header chip.
+- `useOverrideImportLock()` — clears `import_locked`, sets `source='approver_override'`, then a normal UPDATE proceeds; the trigger logs the change with `action='override'`.
+- CSV importers in A/R, Future Hires, Weekly Actuals: before insert, call `supabase.rpc('set_import_context', { filename })` which sets `app.source='import'` + `app.import_filename` for the txn so triggers tag rows correctly. New columns `source='import'`, `import_filename`, `import_locked=true` are also written explicitly on the inserted rows.
 
-### 4. Future Hires page (`src/pages/FutureHires.tsx`) — full rewrite
+### 3. UI changes
 
-#### Hire table (top)
+**Sidebar (`AppLayout.tsx`)**
+- Add nav item **Audit Log** (`/audit-log`, `ScrollText` icon).
+- Show role chip under user email ("Approver" / "Editor" / "Viewer").
 
-Inline editable spreadsheet (matches the A/R table pattern):
+**Role gating**
+- New `<RoleGate role="editor|approver">` component wraps edit affordances. Viewers see grids in read-only mode (inputs become text, Add/Delete buttons hidden). Editors get current behavior. Approvers additionally see Sign-off and Override buttons.
 
-| Name | Role | Annual Salary | Start Date | Status | Notes | ✕ |
-|---|---|---|---|---|---|---|
+**Dashboard (`ForecastGrid.tsx` + `Dashboard.tsx`)**
+- Each week column header gets a stacked footer chip: green ✓ "Approved by ram@vapi.ai · Apr 22" when signed-off; otherwise "Sign off" button (approver-only). Signed-off weeks: actuals cells in that week become read-only and get a subtle green tint.
+- Below the week label, a small muted line: "Updated by {email}, {date time}" pulled from `useLastUpdatedByWeek()`.
+- Pass `signoffs` map into `ForecastGrid`; `ActualsCell` accepts `locked` + `lockReason` props.
 
-- All cells edit on blur via `useUpsertHire`.
-- **Start Date**: Shadcn datepicker (Popover + Calendar with `pointer-events-auto`).
-- **Status**: Select with three options. Renders a colored dot inline:
-  - Confirmed → `bg-green-500`
-  - Offer Sent → `bg-amber-500`
-  - Interviewing → `bg-gray-400`
-- **Add hire** button inserts a blank draft row at the bottom (saved on first valid name + role + salary + date).
-- **✕** uses existing `useDeleteHire`.
-- The legacy "Department" column is dropped from the UI (column stays in DB, defaults to null).
+**A/R, Future Hires, Weekly Actuals grids**
+- Cells derived from imported rows render with `bg-muted` gray background and are read-only.
+- A small lock icon in the row's action column. For approvers, hovering reveals an "Override" button that calls `useOverrideImportLock()`; the next edit is allowed and trigger-logged as `approver_override`.
 
-#### CSV import
+**Audit Log page (`src/pages/AuditLog.tsx`)**
+- Filter bar: user (combobox of distinct emails), date range (date picker), table (multi-select), action (multi-select).
+- Table: timestamp · user · action (badge) · table · field · old → new · source (chip with filename when import). Pagination 50/page.
+- "Export CSV" button writes filtered set via SheetJS (already in deps) — purely client-side.
+- **No delete button anywhere**, ever.
 
-Drag-and-drop dropzone above the table (reuse the styling pattern of `CsvDropzone`):
+### 4. Excel export (`src/lib/exportExcel.ts`)
+- Add second sheet **"Audit"**: pulls `audit_log` rows whose `created_at` falls within the snapshot's forecast window. Columns mirror the page table.
 
-- New parser `src/lib/parseHiresCsv.ts` — hand-written, no new deps. Tolerant headers:
-  - `Name` / `Full Name`
-  - `Role` / `Title` / `Position`
-  - `Salary` / `Annual Salary` / `Base`
-  - `Start Date` / `Start` / `Date`
-  - `Status` (mapped: "confirmed"/"signed"/"accepted" → confirmed, "offer"/"offer sent" → offer_sent, anything else / blank → interviewing)
-- Preview dialog (new `src/components/hires/HiresCsvPreviewDialog.tsx`) with row checkboxes and inline status edit before commit. Bulk insert via `useUpsertHire` sequentially with a final toast count.
+### 5. Acceptance
 
-#### Payroll Impact Grid (below the table)
+- Editing any tracked table writes one audit_log row per changed field; trying to DELETE from `audit_log` errors out (no policy).
+- `ram@vapi.ai` sees Sign-off buttons and Override actions; other users do not.
+- Imported A/R / hires / actuals rows render gray and read-only until an approver overrides.
+- Signed-off week locks all actuals cells in that column and shows a green ✓ with name + date.
+- Audit Log page filters and exports to CSV; sidebar shows Audit Log entry.
+- Excel download contains an "Audit" sheet alongside "13-Week Forecast".
 
-A 6-column grid with one row per hire and a bold TOTAL row.
-
-```text
-Hire        | P1 (Apr16-30) | P2 (May1-15) | P3 (May16-31) | P4 (Jun1-15) | P5 (Jun16-30) | P6 (Jul1-15) | Sum
-```
-
-Period definitions (hardcoded constant, dates in 2026):
-
-```ts
-const PERIODS = [
-  { key: 'P1', start: '2026-04-16', end: '2026-04-30', days: 15, weekIndex: 1 },  // W2
-  { key: 'P2', start: '2026-05-01', end: '2026-05-15', days: 15, weekIndex: 3 },  // W4
-  { key: 'P3', start: '2026-05-16', end: '2026-05-31', days: 16, weekIndex: 5 },  // W6
-  { key: 'P4', start: '2026-06-01', end: '2026-06-15', days: 15, weekIndex: 7 },  // W8
-  { key: 'P5', start: '2026-06-16', end: '2026-06-30', days: 15, weekIndex: 9 },  // W10
-  { key: 'P6', start: '2026-07-01', end: '2026-07-15', days: 15, weekIndex: 11 }, // W12
-];
-```
-
-Per-cell formula (exactly as specified):
-
-```ts
-const eligibleDays = Math.max(0,
-  daysBetween(periodEnd, max(startDate, periodStart)) + 1
-);
-const fraction = eligibleDays / period.days;          // capped at 1 by the formula
-const cell = fraction * (annualSalary / 26);
-```
-
-Footer TOTAL row sums each period column (bold, `tabular-nums`).
-
-Status filter note: per spec, **all hires** are included in the grid regardless of status (the user opted not to filter). Status is a metadata flag for the table only. If the user later wants to exclude `interviewing`, that's a one-liner toggle.
-
-#### Apply to Model
-
-A button at the top-right of the page (next to "Add hire"):
-
-- Builds a 13-element `weeks[]` array where `weeks[period.weekIndex] = TOTAL[period.key]`, and zeros elsewhere.
-- Calls `useApplyHirePayrollOverride.mutate({ weeks, periods: [{key,total}, ...] })`.
-- Invalidates `["hire_payroll_overrides"]`, `["future_hires"]`. Toast confirmation.
-
-### 5. Dashboard wiring (`src/pages/Dashboard.tsx`)
-
-- Read `useHirePayrollOverride()` alongside `useArWeeklyOverride()`.
-- Pass `hireOverride={ weeks: override?.weeks }` to `buildForecast`. Fallback to existing per-hire computation if no snapshot exists.
-
-### 6. Files touched
-
-- **Migration** (new): adds `hire_status` enum, `future_hires.status` column, and `hire_payroll_overrides` table with RLS + index.
-- `src/lib/forecast.ts` — accept `hireOverride`, prefer it over the per-hire reduce.
-- `src/hooks/useFinanceData.ts` — extend `FutureHire`, add the two override hooks.
-- `src/pages/FutureHires.tsx` — full rewrite (inline grid + CSV dropzone + payroll grid + Apply to Model).
-- `src/pages/Dashboard.tsx` — pass hire override into `buildForecast`.
-- **New files**:
-  - `src/lib/parseHiresCsv.ts`
-  - `src/lib/payrollPeriods.ts` (PERIODS constant + per-cell formula helper, shared between page and any future use)
-  - `src/components/hires/HireInlineRow.tsx`
-  - `src/components/hires/HiresCsvDropzone.tsx`
-  - `src/components/hires/HiresCsvPreviewDialog.tsx`
-  - `src/components/hires/PayrollImpactGrid.tsx`
-
-### Acceptance
-
-- Hire table edits auto-save; status renders with the correct colored dot.
-- CSV drop opens a preview with parsed rows and inline status edit; confirm bulk-inserts.
-- Payroll grid math: a hire with `start=2026-04-20`, `salary=260,000` shows P1 = `(11/15) × (260000/26) = 7,333.33`, P2..P6 = `10,000`.
-- Clicking **Apply to Model** writes the 6 totals into `hire_payroll_overrides.weeks[]` at indices 1/3/5/7/9/11 and the Dashboard payroll row reflects them on next render.
-- Existing dashboard payroll fallback still works when no snapshot exists.
