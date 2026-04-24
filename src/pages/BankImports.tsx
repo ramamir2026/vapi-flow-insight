@@ -651,9 +651,10 @@ const StatementUploadsTab = () => {
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            Upload the most recent monthly statement (CSV or text-based PDF) for each account. The closing
-            balance is compared to the value in Assumptions; any mismatch over $100 is flagged and can be fixed
-            with one click.
+            Upload the most recent monthly statement (CSV or text-based PDF) for each account, or a Brex
+            credit card statement. Bank statements are checked against the cash assumption (mismatch over
+            $100 is flagged); card statements are checked against the matching card-payment assumption
+            (mismatch over 5% is flagged). Card statements are auto-detected — pick any account here.
           </p>
           <RoleGate
             role="editor"
