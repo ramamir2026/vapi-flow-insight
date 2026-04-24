@@ -89,6 +89,19 @@ export interface JoinedLine {
   pct: number;
 }
 
+export interface CashFlowBreakdown {
+  // Inflow components
+  stripe: number;
+  enterprise: number;
+  ar: number;
+  // Outflow components
+  payroll: number;
+  cogs: number;
+  card: number;
+  opex: number;
+  rent: number;
+}
+
 export interface JoinedWeek {
   weekStart: string; // ISO yyyy-mm-dd (monday)
   modeledClosing: number;
@@ -99,6 +112,8 @@ export interface JoinedWeek {
   modeledOutflows: number;
   actualInflows: number;
   actualOutflows: number;
+  modeledBreakdown: CashFlowBreakdown;
+  actualBreakdown: CashFlowBreakdown;
   modeledOpening: number;
   /** runway months estimate (using the week's burn extrapolated to monthly). */
   actualRunwayMonths: number | null;
@@ -141,6 +156,27 @@ export const joinWeeks = (model: ModelWeekRow[], actuals: WeeklyActualRow[]): Jo
   for (const m of model) {
     const a = actualByWeek.get(m.week_start_date);
     if (!a) continue;
+
+    const modeledBreakdown: CashFlowBreakdown = {
+      stripe: Number(m.stripe_revenue),
+      enterprise: Number(m.enterprise_revenue),
+      ar: Number(m.ar_collections),
+      payroll: Number(m.payroll),
+      cogs: Number(m.cogs),
+      card: Number(m.card_payments),
+      opex: Number(m.opex),
+      rent: Number(m.rent),
+    };
+    const actualBreakdown: CashFlowBreakdown = {
+      stripe: a.lineMap.stripeRevenue ?? 0,
+      enterprise: a.lineMap.enterpriseRevenue ?? 0,
+      ar: a.lineMap.arCollections ?? 0,
+      payroll: a.lineMap.payroll ?? 0,
+      cogs: sumActualByPrefix(a.lineMap, "cogs_"),
+      card: a.lineMap.brexCard ?? 0,
+      opex: sumActualByPrefix(a.lineMap, "opex_"),
+      rent: a.lineMap.rent ?? 0,
+    };
 
     const modeledInflows = sumModeledInflows(m);
     const modeledOutflows = sumModeledOutflows(m);
