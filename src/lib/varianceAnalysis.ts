@@ -116,19 +116,17 @@ const sumActualByPrefix = (map: Record<string, number>, prefix: string) =>
     .filter((k) => k.startsWith(prefix))
     .reduce((s, k) => s + (Number(map[k]) || 0), 0);
 
-const computeActualBurn = (a: WeeklyActualRow): number => {
-  const inflows =
-    (a.lineMap.stripeRevenue ?? 0) +
-    (a.lineMap.enterpriseRevenue ?? 0) +
-    (a.lineMap.arCollections ?? 0);
-  const outflows =
-    (a.lineMap.payroll ?? 0) +
-    sumActualByPrefix(a.lineMap, "cogs_") +
-    (a.lineMap.brexCard ?? 0) +
-    sumActualByPrefix(a.lineMap, "opex_") +
-    (a.lineMap.rent ?? 0);
-  return outflows - inflows;
-};
+const computeActualInflows = (a: WeeklyActualRow): number =>
+  (a.lineMap.stripeRevenue ?? 0) +
+  (a.lineMap.enterpriseRevenue ?? 0) +
+  (a.lineMap.arCollections ?? 0);
+
+const computeActualOutflows = (a: WeeklyActualRow): number =>
+  (a.lineMap.payroll ?? 0) +
+  sumActualByPrefix(a.lineMap, "cogs_") +
+  (a.lineMap.brexCard ?? 0) +
+  sumActualByPrefix(a.lineMap, "opex_") +
+  (a.lineMap.rent ?? 0);
 
 /** Join model_weeks (one snapshot) with weekly_actuals on week_start_date. Only weeks with both sides. */
 export const joinWeeks = (model: ModelWeekRow[], actuals: WeeklyActualRow[]): JoinedWeek[] => {
@@ -144,8 +142,12 @@ export const joinWeeks = (model: ModelWeekRow[], actuals: WeeklyActualRow[]): Jo
     const a = actualByWeek.get(m.week_start_date);
     if (!a) continue;
 
-    const modeledBurn = sumModeledOutflows(m) - sumModeledInflows(m);
-    const actualBurn = computeActualBurn(a);
+    const modeledInflows = sumModeledInflows(m);
+    const modeledOutflows = sumModeledOutflows(m);
+    const actualInflows = computeActualInflows(a);
+    const actualOutflows = computeActualOutflows(a);
+    const modeledBurn = modeledOutflows - modeledInflows;
+    const actualBurn = actualOutflows - actualInflows;
 
     const modeledClosing = Number(m.closing_balance);
     const actualClosing = a.closing_cash_balance || a.lineMap.closingBalance || 0;
@@ -206,6 +208,10 @@ export const joinWeeks = (model: ModelWeekRow[], actuals: WeeklyActualRow[]): Jo
       actualClosing,
       modeledBurn,
       actualBurn,
+      modeledInflows,
+      modeledOutflows,
+      actualInflows,
+      actualOutflows,
       modeledOpening: Number(m.opening_balance),
       actualRunwayMonths,
       modeledRunwayMonths,
