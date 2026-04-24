@@ -40,37 +40,44 @@ const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 
 type Field = "name" | "role" | "salary" | "startDate" | "status" | "notes";
 
-const HEADER_MAP: Record<string, Field> = {
-  // Name variants
-  name: "name",
-  fullname: "name",
-  employeename: "name",
-  hire: "name",
+// Higher priority wins when multiple columns could map to the same field.
+// e.g. "Compensation" beats "Base Salary"; "Start Date" beats "Est Start Date";
+// "New Hire" beats generic "Name".
+const HEADER_MAP: Record<string, { field: Field; priority: number }> = {
+  // Name variants — "New Hire" is the actual person in Google Sheets roadmap
+  newhire: { field: "name", priority: 10 },
+  name: { field: "name", priority: 5 },
+  fullname: { field: "name", priority: 5 },
+  employeename: { field: "name", priority: 5 },
+  hire: { field: "name", priority: 3 },
   // Role variants
-  role: "role",
-  title: "role",
-  position: "role",
-  jobtitle: "role",
-  // Salary variants
-  salary: "salary",
-  annualsalary: "salary",
-  base: "salary",
-  basesalary: "salary",
-  compensation: "salary",
-  comp: "salary",
-  // Start date variants
-  startdate: "startDate",
-  start: "startDate",
-  date: "startDate",
-  hiredate: "startDate",
+  role: { field: "role", priority: 10 },
+  title: { field: "role", priority: 5 },
+  position: { field: "role", priority: 5 },
+  jobtitle: { field: "role", priority: 5 },
+  // Salary variants — "Compensation" is the negotiated salary, beats "Base Salary"
+  compensation: { field: "salary", priority: 10 },
+  comp: { field: "salary", priority: 8 },
+  annualsalary: { field: "salary", priority: 7 },
+  salary: { field: "salary", priority: 6 },
+  basesalary: { field: "salary", priority: 4 },
+  base: { field: "salary", priority: 3 },
+  // Start date variants — actual "Start Date" beats "Est Start Date"
+  startdate: { field: "startDate", priority: 10 },
+  hiredate: { field: "startDate", priority: 8 },
+  eststartdate: { field: "startDate", priority: 4 },
+  estimatedstartdate: { field: "startDate", priority: 4 },
+  start: { field: "startDate", priority: 3 },
+  date: { field: "startDate", priority: 1 },
   // Status variants
-  status: "status",
-  offerstatus: "status",
-  stage: "status",
+  hiringstage: { field: "status", priority: 10 },
+  status: { field: "status", priority: 8 },
+  offerstatus: { field: "status", priority: 8 },
+  stage: { field: "status", priority: 6 },
   // Notes
-  notes: "notes",
-  note: "notes",
-  comments: "notes",
+  notes: { field: "notes", priority: 10 },
+  note: { field: "notes", priority: 8 },
+  comments: { field: "notes", priority: 6 },
 };
 
 const parseAmount = (s: string): number => {
