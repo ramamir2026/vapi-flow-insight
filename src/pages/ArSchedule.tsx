@@ -235,6 +235,8 @@ const ArSchedule = () => {
                     forecastStartIso={forecastStartIso}
                     onSave={handleSaveRow}
                     onDelete={() => del.mutate(entry.id)}
+                    isApprover={isApprover}
+                    onOverrideLock={() => overrideLock.mutate({ table: "ar_entries", rowId: entry.id })}
                   />
                 ))}
                 {showNew && (
