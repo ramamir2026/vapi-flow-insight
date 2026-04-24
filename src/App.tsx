@@ -6,7 +6,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AppLayout } from "@/components/AppLayout";
-import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Assumptions from "./pages/Assumptions";
 import ArSchedule from "./pages/ArSchedule";
@@ -33,7 +32,6 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <Routes>
-            <Route path="/auth" element={<Auth />} />
             <Route path="/" element={<Shell><Dashboard /></Shell>} />
             <Route path="/assumptions" element={<Shell><Assumptions /></Shell>} />
             <Route path="/ar-schedule" element={<Shell><ArSchedule /></Shell>} />
