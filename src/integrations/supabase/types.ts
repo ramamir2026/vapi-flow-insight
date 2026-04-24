@@ -442,6 +442,29 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_add_user_role: {
+        Args: {
+          p_email: string
+          p_role: Database["public"]["Enums"]["app_role"]
+        }
+        Returns: undefined
+      }
+      admin_list_user_roles: {
+        Args: never
+        Returns: {
+          created_at: string
+          email: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }[]
+      }
+      admin_set_user_role: {
+        Args: {
+          p_role: Database["public"]["Enums"]["app_role"]
+          p_user_id: string
+        }
+        Returns: undefined
+      }
       clear_import_lock: {
         Args: { p_row: string; p_table: string }
         Returns: undefined
