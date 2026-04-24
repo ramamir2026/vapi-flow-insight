@@ -13,7 +13,7 @@ import {
 } from "recharts";
 import { Card } from "@/components/ui/card";
 import { formatCurrency, formatWeekRange } from "@/lib/format";
-import type { JoinedWeek } from "@/lib/varianceAnalysis";
+import type { CashFlowBreakdown, JoinedWeek } from "@/lib/varianceAnalysis";
 
 interface Props {
   weeks: JoinedWeek[];
@@ -39,23 +39,72 @@ interface Datum {
   modeledInflow: number;
   modeledOutflow: number;
   net: number;
+  actualBreakdown: CashFlowBreakdown;
+  modeledBreakdown: CashFlowBreakdown;
 }
+
+const InflowRows = ({ b, color }: { b: CashFlowBreakdown; color: string }) => (
+  <>
+    <span className="text-muted-foreground" style={{ color }}>Stripe</span>
+    <span className="text-right tabular-nums">{formatCurrency(b.stripe)}</span>
+    <span className="text-muted-foreground" style={{ color }}>Enterprise ACH</span>
+    <span className="text-right tabular-nums">{formatCurrency(b.enterprise)}</span>
+    <span className="text-muted-foreground" style={{ color }}>A/R</span>
+    <span className="text-right tabular-nums">{formatCurrency(b.ar)}</span>
+  </>
+);
+
+const OutflowRows = ({ b, color }: { b: CashFlowBreakdown; color: string }) => (
+  <>
+    <span className="text-muted-foreground" style={{ color }}>Payroll</span>
+    <span className="text-right tabular-nums">{formatCurrency(b.payroll)}</span>
+    <span className="text-muted-foreground" style={{ color }}>COGS</span>
+    <span className="text-right tabular-nums">{formatCurrency(b.cogs)}</span>
+    <span className="text-muted-foreground" style={{ color }}>Card</span>
+    <span className="text-right tabular-nums">{formatCurrency(b.card)}</span>
+    <span className="text-muted-foreground" style={{ color }}>OpEx</span>
+    <span className="text-right tabular-nums">{formatCurrency(b.opex)}</span>
+    <span className="text-muted-foreground" style={{ color }}>Rent</span>
+    <span className="text-right tabular-nums">{formatCurrency(b.rent)}</span>
+  </>
+);
 
 const ChartTooltip = ({ active, payload }: any) => {
   if (!active || !payload?.length) return null;
   const d = payload[0].payload as Datum;
+  // Which bar/line is being hovered? Recharts gives us the dataKey.
+  const hoveredKey: string | undefined = payload[0]?.dataKey;
+  const showInflow = hoveredKey === "actualInflow" || hoveredKey === "modeledInflow";
+  const showOutflow = hoveredKey === "actualOutflow" || hoveredKey === "modeledOutflow";
+  const showBoth = !showInflow && !showOutflow; // net line or general hover
+
   return (
-    <div className="rounded-md border border-border bg-card px-3 py-2 text-xs shadow-md">
-      <div className="mb-1 font-semibold">{d.fullWeek}</div>
-      <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-        <span className="text-muted-foreground">Actual In</span>
-        <span className="text-right tabular-nums" style={{ color: COLOR_INFLOW }}>
-          {formatCurrency(d.actualInflow)}
-        </span>
-        <span className="text-muted-foreground">Actual Out</span>
-        <span className="text-right tabular-nums" style={{ color: COLOR_OUTFLOW }}>
-          {formatCurrency(Math.abs(d.actualOutflow))}
-        </span>
+    <div className="min-w-[220px] rounded-md border border-border bg-card px-3 py-2 text-xs shadow-md">
+      <div className="mb-2 font-semibold">{d.fullWeek}</div>
+
+      {(showInflow || showBoth) && (
+        <div className="mb-2">
+          <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider" style={{ color: COLOR_INFLOW }}>
+            Inflows · {formatCurrency(d.actualInflow)} actual
+          </div>
+          <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
+            <InflowRows b={d.actualBreakdown} color={COLOR_INFLOW} />
+          </div>
+        </div>
+      )}
+
+      {(showOutflow || showBoth) && (
+        <div className="mb-2">
+          <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider" style={{ color: COLOR_OUTFLOW }}>
+            Outflows · {formatCurrency(Math.abs(d.actualOutflow))} actual
+          </div>
+          <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
+            <OutflowRows b={d.actualBreakdown} color={COLOR_OUTFLOW} />
+          </div>
+        </div>
+      )}
+
+      <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-0.5 border-t border-border pt-2">
         <span className="text-muted-foreground">Modeled In</span>
         <span className="text-right tabular-nums">{formatCurrency(d.modeledInflow)}</span>
         <span className="text-muted-foreground">Modeled Out</span>
