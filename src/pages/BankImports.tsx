@@ -44,6 +44,13 @@ import {
   extractTextFromPdf,
 } from "@/lib/bankParsers/statement";
 import {
+  cardAssumptionKeyForMonth,
+  extractCardStatementMonth,
+  extractCardTotalFromCsv,
+  extractCardTotalFromText,
+  isCardStatement,
+} from "@/lib/bankParsers/cardStatement";
+import {
   useBankCategoryRules,
   useBankStatements,
   useBankTransactionStats,
@@ -579,15 +586,38 @@ const StatementUploadsTab = () => {
   const handleFile = async (file: File, source: BankSource) => {
     setBusy(source);
     try {
+      const isPdf = file.name.toLowerCase().endsWith(".pdf");
+      const rawText = isPdf ? await extractTextFromPdf(file) : await file.text();
+
+      // Detect a credit card statement regardless of which account the user
+      // selected — card statements never represent a cash account balance.
+      if (isCardStatement(rawText)) {
+        const total = isPdf
+          ? extractCardTotalFromText(rawText)
+          : (extractCardTotalFromCsv(rawText) ?? extractCardTotalFromText(rawText));
+        if (total == null) {
+          toast.error(
+            "Detected a card statement, but could not read the total charges. Try a PDF export from Brex."
+          );
+          return;
+        }
+        const month = extractCardStatementMonth(rawText) ?? new Date().toISOString().slice(0, 8) + "01";
+        await upload.mutateAsync({
+          bank_source: "brex_card" as BankSource,
+          statement_date: month,
+          closing_balance: total,
+          filename: file.name,
+        });
+        return;
+      }
+
+      // Otherwise treat it as a bank account statement.
       let closing: number | null = null;
-      let parsedText: string | null = null;
-      if (file.name.toLowerCase().endsWith(".pdf")) {
-        parsedText = await extractTextFromPdf(file);
-        closing = extractClosingBalanceFromText(parsedText);
+      if (isPdf) {
+        closing = extractClosingBalanceFromText(rawText);
       } else {
-        const text = await file.text();
-        closing = extractClosingBalanceFromCsv(text);
-        if (closing == null) closing = extractClosingBalanceFromText(text);
+        closing = extractClosingBalanceFromCsv(rawText);
+        if (closing == null) closing = extractClosingBalanceFromText(rawText);
       }
       if (closing == null) {
         toast.error(
@@ -606,6 +636,13 @@ const StatementUploadsTab = () => {
     }
   };
 
+  // All Brex card statements (one row per month).
+  const cardStatements = useMemo(
+    () => statements.filter((s) => s.bank_source === ("brex_card" as BankSource)),
+    [statements]
+  );
+
+
   return (
     <div className="space-y-6">
       <Card>
@@ -614,9 +651,10 @@ const StatementUploadsTab = () => {
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            Upload the most recent monthly statement (CSV or text-based PDF) for each account. The closing
-            balance is compared to the value in Assumptions; any mismatch over $100 is flagged and can be fixed
-            with one click.
+            Upload the most recent monthly statement (CSV or text-based PDF) for each account, or a Brex
+            credit card statement. Bank statements are checked against the cash assumption (mismatch over
+            $100 is flagged); card statements are checked against the matching card-payment assumption
+            (mismatch over 5% is flagged). Card statements are auto-detected — pick any account here.
           </p>
           <RoleGate
             role="editor"
@@ -720,6 +758,73 @@ const StatementUploadsTab = () => {
                             variant="outline"
                             onClick={() =>
                               updateAssumption.mutate({ id: assum.id, value: stmt.closing_balance })
+                            }
+                          >
+                            Update to {formatCurrency(stmt.closing_balance, { compact: true })}
+                          </Button>
+                        </RoleGate>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+              {cardStatements.map((stmt) => {
+                const monthLabel = format(new Date(stmt.statement_date), "MMMM yyyy");
+                const assumKey = cardAssumptionKeyForMonth(
+                  stmt.statement_date,
+                  assumptions.map((a) => ({ key: a.key, label: a.label ?? null }))
+                );
+                const assum = assumKey ? assumptionByKey[assumKey] : undefined;
+                const modeled = assum ? Number(assum.value) : null;
+                const driftPct =
+                  modeled != null && modeled !== 0
+                    ? ((stmt.closing_balance - modeled) / modeled) * 100
+                    : null;
+                const matches = driftPct != null && Math.abs(driftPct) <= 5;
+                return (
+                  <TableRow key={stmt.id}>
+                    <TableCell className="font-medium">Brex Card — {monthLabel}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {modeled != null ? formatCurrency(modeled, { compact: false }) : "—"}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatCurrency(stmt.closing_balance, { compact: false })}
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{monthLabel}</TableCell>
+                    <TableCell>
+                      {modeled == null && (
+                        <Badge variant="outline" className="text-muted-foreground">
+                          No matching assumption
+                        </Badge>
+                      )}
+                      {modeled != null && matches && (
+                        <Badge
+                          variant="outline"
+                          className="border-[hsl(var(--success))]/40 text-[hsl(var(--success))]"
+                        >
+                          <CheckCircle2 className="mr-1 h-3 w-3" /> Within 5%
+                        </Badge>
+                      )}
+                      {modeled != null && !matches && driftPct != null && (
+                        <Badge variant="outline" className={cn(warnBorder, warnText)}>
+                          <AlertCircle className="mr-1 h-3 w-3" />
+                          {monthLabel.split(" ")[0]} card statement{" "}
+                          {formatCurrency(stmt.closing_balance, { compact: true })} — model assumes{" "}
+                          {formatCurrency(modeled, { compact: true })}. Update card payment assumption?
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {modeled != null && !matches && assum && (
+                        <RoleGate role="editor">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              updateAssumption.mutate({
+                                id: assum.id,
+                                value: stmt.closing_balance,
+                              })
                             }
                           >
                             Update to {formatCurrency(stmt.closing_balance, { compact: true })}
