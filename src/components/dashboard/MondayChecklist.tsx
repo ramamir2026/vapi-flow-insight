@@ -4,8 +4,6 @@ import { format } from "date-fns";
 import {
   AlertTriangle,
   CheckCircle2,
-  ChevronDown,
-  ChevronUp,
   Circle,
   ExternalLink,
   ListChecks,
@@ -13,7 +11,6 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { useToggleChecklistItem, useWeeklyChecklist } from "@/hooks/useBankData";
 import { useLatestForecastAt } from "@/hooks/useFinanceData";
 import { useOpenAlerts } from "@/hooks/useAlerts";
