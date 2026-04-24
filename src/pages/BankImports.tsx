@@ -586,15 +586,38 @@ const StatementUploadsTab = () => {
   const handleFile = async (file: File, source: BankSource) => {
     setBusy(source);
     try {
+      const isPdf = file.name.toLowerCase().endsWith(".pdf");
+      const rawText = isPdf ? await extractTextFromPdf(file) : await file.text();
+
+      // Detect a credit card statement regardless of which account the user
+      // selected — card statements never represent a cash account balance.
+      if (isCardStatement(rawText)) {
+        const total = isPdf
+          ? extractCardTotalFromText(rawText)
+          : (extractCardTotalFromCsv(rawText) ?? extractCardTotalFromText(rawText));
+        if (total == null) {
+          toast.error(
+            "Detected a card statement, but could not read the total charges. Try a PDF export from Brex."
+          );
+          return;
+        }
+        const month = extractCardStatementMonth(rawText) ?? new Date().toISOString().slice(0, 8) + "01";
+        await upload.mutateAsync({
+          bank_source: "brex_card" as BankSource,
+          statement_date: month,
+          closing_balance: total,
+          filename: file.name,
+        });
+        return;
+      }
+
+      // Otherwise treat it as a bank account statement.
       let closing: number | null = null;
-      let parsedText: string | null = null;
-      if (file.name.toLowerCase().endsWith(".pdf")) {
-        parsedText = await extractTextFromPdf(file);
-        closing = extractClosingBalanceFromText(parsedText);
+      if (isPdf) {
+        closing = extractClosingBalanceFromText(rawText);
       } else {
-        const text = await file.text();
-        closing = extractClosingBalanceFromCsv(text);
-        if (closing == null) closing = extractClosingBalanceFromText(text);
+        closing = extractClosingBalanceFromCsv(rawText);
+        if (closing == null) closing = extractClosingBalanceFromText(rawText);
       }
       if (closing == null) {
         toast.error(
@@ -612,6 +635,13 @@ const StatementUploadsTab = () => {
       setBusy(null);
     }
   };
+
+  // All Brex card statements (one row per month).
+  const cardStatements = useMemo(
+    () => statements.filter((s) => s.bank_source === ("brex_card" as BankSource)),
+    [statements]
+  );
+
 
   return (
     <div className="space-y-6">
