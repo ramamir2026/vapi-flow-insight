@@ -160,13 +160,13 @@ export const CATEGORY_LABEL: Record<SvbCategory, string> = {
 };
 
 // Categories that map to actuals row keys in weekly_actuals.notes JSON.
-// Keys must match those used by the Dashboard ForecastGrid.
+// Keys must match those used by the Dashboard ForecastGrid (see actualKey props).
 export const CATEGORY_TO_ACTUAL_KEY: Partial<Record<SvbCategory, string>> = {
   payroll: "payroll",
-  cogs: "cogs",
-  card_payments: "cardPayments",
+  cogs: "cogs_total",
+  card_payments: "brexCard",
   rent: "rent",
-  opex: "opex",
+  opex: "opex_total",
   stripe_revenue: "stripeRevenue",
   enterprise_revenue: "enterpriseRevenue",
   ar_collections: "arCollections",
