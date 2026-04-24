@@ -248,6 +248,8 @@ export const joinWeeks = (model: ModelWeekRow[], actuals: WeeklyActualRow[]): Jo
       modeledOutflows,
       actualInflows,
       actualOutflows,
+      modeledBreakdown,
+      actualBreakdown,
       modeledOpening: Number(m.opening_balance),
       actualRunwayMonths,
       modeledRunwayMonths,
