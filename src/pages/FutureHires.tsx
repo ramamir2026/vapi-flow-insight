@@ -32,6 +32,8 @@ import {
   periodsToWeeks,
 } from "@/lib/payrollPeriods";
 import { setImportContext, useIsApprover, useOverrideImportLock } from "@/hooks/useControls";
+import { useAutoCheckChecklistItem } from "@/hooks/useBankData";
+import { useAuth } from "@/hooks/useAuth";
 import { formatCurrency } from "@/lib/format";
 import { toast } from "sonner";
 
@@ -121,13 +123,23 @@ const FutureHires = () => {
     [periodTotals]
   );
 
+  const autoCheck = useAutoCheckChecklistItem();
+  const { user } = useAuth();
+
   const handleApplyToModel = () => {
     const weeks = periodsToWeeks(periodTotals);
     const periods = PAYROLL_PERIODS.map((p) => ({
       key: p.key,
       total: periodTotals[p.key] ?? 0,
     }));
-    apply.mutate({ weeks, periods });
+    apply.mutate(
+      { weeks, periods },
+      {
+        onSuccess: () => {
+          autoCheck.mutate({ itemKey: "hires_apply", email: user?.email ?? null });
+        },
+      },
+    );
   };
 
   if (isLoading) return <Skeleton className="h-96" />;

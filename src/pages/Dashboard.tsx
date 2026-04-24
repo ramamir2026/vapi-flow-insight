@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -24,8 +25,10 @@ import { exportForecastToExcel } from "@/lib/exportExcel";
 import { formatCurrency, formatNumber } from "@/lib/format";
 import { ForecastGrid } from "@/components/forecast/ForecastGrid";
 import { BalanceVerificationBanner } from "@/components/dashboard/BalanceVerificationBanner";
-import { WeeklyChecklist } from "@/components/dashboard/WeeklyChecklist";
+import { MondayChecklist } from "@/components/dashboard/MondayChecklist";
 import { AlertsPanel } from "@/components/dashboard/AlertsPanel";
+import { useAutoCheckChecklistItem } from "@/hooks/useBankData";
+import { useAuth } from "@/hooks/useAuth";
 import { useCreateAlerts, useSaveVarianceSnapshots } from "@/hooks/useAlerts";
 import { detectAlerts, type VarianceTxn } from "@/lib/variance";
 import { supabase } from "@/integrations/supabase/client";
@@ -82,6 +85,23 @@ export default function Dashboard() {
   const saveSnapshot = useSaveForecastSnapshot();
   const createAlerts = useCreateAlerts();
   const saveVarianceSnapshots = useSaveVarianceSnapshots();
+  const autoCheck = useAutoCheckChecklistItem();
+  const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const generateBtnRef = useRef<HTMLButtonElement>(null);
+
+  // Briefly highlight the Generate Forecast button when arriving with ?focus=generate.
+  useEffect(() => {
+    if (searchParams.get("focus") !== "generate") return;
+    const el = generateBtnRef.current;
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.classList.add("ring-2", "ring-primary", "ring-offset-2");
+    const timer = window.setTimeout(() => {
+      el.classList.remove("ring-2", "ring-primary", "ring-offset-2");
+    }, 2500);
+    return () => window.clearTimeout(timer);
+  }, [searchParams]);
 
   const signoffMap = useMemo(() => {
     const m: Record<string, NonNullable<typeof signoffsList>[number]> = {};
@@ -223,6 +243,7 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
+      <MondayChecklist />
       <BalanceVerificationBanner />
       <AlertsPanel />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -237,7 +258,12 @@ export default function Dashboard() {
             <Download className="h-4 w-4 mr-2" />
             Download Excel
           </Button>
-          <Button onClick={handleGenerate} disabled={saveSnapshot.isPending}>
+          <Button
+            ref={generateBtnRef}
+            onClick={handleGenerate}
+            disabled={saveSnapshot.isPending}
+            className="transition-shadow"
+          >
             <RefreshCw className={cn("h-4 w-4 mr-2", saveSnapshot.isPending && "animate-spin")} />
             Generate Forecast
           </Button>
@@ -280,11 +306,15 @@ export default function Dashboard() {
         onActualChange={(rowKey, value) => updateActual.mutate({ rowKey, value })}
         signoffs={signoffMap}
         isApprover={isApprover}
-        onSignOff={(iso) => signOff.mutate(iso)}
+        onSignOff={(iso) =>
+          signOff.mutate(iso, {
+            onSuccess: () => {
+              autoCheck.mutate({ itemKey: "signoff", email: user?.email ?? null });
+            },
+          })
+        }
         onUnsign={(iso) => unsign.mutate(iso)}
       />
-
-      <WeeklyChecklist />
     </div>
   );
 }

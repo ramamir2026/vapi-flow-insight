@@ -19,6 +19,8 @@ import {
   type ArEntry,
 } from "@/hooks/useFinanceData";
 import { setImportContext, useIsApprover, useOverrideImportLock } from "@/hooks/useControls";
+import { useAutoCheckChecklistItem } from "@/hooks/useBankData";
+import { useAuth } from "@/hooks/useAuth";
 import { ArInlineRow, encodeNotes, parseNotes, type ArRowDraft } from "@/components/ar/ArInlineRow";
 import { CsvDropzone } from "@/components/ar/CsvDropzone";
 import { CsvPreviewDialog } from "@/components/ar/CsvPreviewDialog";
@@ -175,9 +177,19 @@ const ArSchedule = () => {
     toast.success(`Imported ${ok} invoice${ok === 1 ? "" : "s"}${fail ? ` (${fail} failed)` : ""}`);
   };
 
+  const autoCheck = useAutoCheckChecklistItem();
+  const { user } = useAuth();
+
   const handleApplyToModel = () => {
     // Always probability-weighted, regardless of toggle
-    applyOverride.mutate({ weeks: weightedWeeks, delayDays: arDelayDays });
+    applyOverride.mutate(
+      { weeks: weightedWeeks, delayDays: arDelayDays },
+      {
+        onSuccess: () => {
+          autoCheck.mutate({ itemKey: "ar_apply", email: user?.email ?? null });
+        },
+      },
+    );
   };
 
   if (isLoading) {

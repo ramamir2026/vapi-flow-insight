@@ -336,6 +336,22 @@ export const useSaveForecastSnapshot = () => {
   });
 };
 
+// Most recent forecast snapshot timestamp — used to decide if the model is stale.
+export const useLatestForecastAt = () =>
+  useQuery({
+    queryKey: ["model_weeks", "latest_created_at"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("model_weeks")
+        .select("created_at")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data?.created_at ? new Date(data.created_at) : null;
+    },
+  });
+
 // ============ Weekly actuals (prior-week column on dashboard) ============
 // We store the per-row actuals as JSON in weekly_actuals.notes for the prior week.
 const priorWeekStartISO = () => {
