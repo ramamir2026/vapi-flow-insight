@@ -768,6 +768,73 @@ const StatementUploadsTab = () => {
                   </TableRow>
                 );
               })}
+              {cardStatements.map((stmt) => {
+                const monthLabel = format(new Date(stmt.statement_date), "MMMM yyyy");
+                const assumKey = cardAssumptionKeyForMonth(
+                  stmt.statement_date,
+                  assumptions.map((a) => ({ key: a.key, label: a.label ?? null }))
+                );
+                const assum = assumKey ? assumptionByKey[assumKey] : undefined;
+                const modeled = assum ? Number(assum.value) : null;
+                const driftPct =
+                  modeled != null && modeled !== 0
+                    ? ((stmt.closing_balance - modeled) / modeled) * 100
+                    : null;
+                const matches = driftPct != null && Math.abs(driftPct) <= 5;
+                return (
+                  <TableRow key={stmt.id}>
+                    <TableCell className="font-medium">Brex Card — {monthLabel}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {modeled != null ? formatCurrency(modeled, { compact: false }) : "—"}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {formatCurrency(stmt.closing_balance, { compact: false })}
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{monthLabel}</TableCell>
+                    <TableCell>
+                      {modeled == null && (
+                        <Badge variant="outline" className="text-muted-foreground">
+                          No matching assumption
+                        </Badge>
+                      )}
+                      {modeled != null && matches && (
+                        <Badge
+                          variant="outline"
+                          className="border-[hsl(var(--success))]/40 text-[hsl(var(--success))]"
+                        >
+                          <CheckCircle2 className="mr-1 h-3 w-3" /> Within 5%
+                        </Badge>
+                      )}
+                      {modeled != null && !matches && driftPct != null && (
+                        <Badge variant="outline" className={cn(warnBorder, warnText)}>
+                          <AlertCircle className="mr-1 h-3 w-3" />
+                          {monthLabel.split(" ")[0]} card statement{" "}
+                          {formatCurrency(stmt.closing_balance, { compact: true })} — model assumes{" "}
+                          {formatCurrency(modeled, { compact: true })}. Update card payment assumption?
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {modeled != null && !matches && assum && (
+                        <RoleGate role="editor">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              updateAssumption.mutate({
+                                id: assum.id,
+                                value: stmt.closing_balance,
+                              })
+                            }
+                          >
+                            Update to {formatCurrency(stmt.closing_balance, { compact: true })}
+                          </Button>
+                        </RoleGate>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </CardContent>
