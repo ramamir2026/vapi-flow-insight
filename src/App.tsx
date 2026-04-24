@@ -34,6 +34,8 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <Routes>
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/" element={<Shell><Dashboard /></Shell>} />
             <Route path="/assumptions" element={<Shell><Assumptions /></Shell>} />
             <Route path="/ar-schedule" element={<Shell><ArSchedule /></Shell>} />
