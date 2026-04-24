@@ -34,15 +34,21 @@ type BucketDef = {
   label: string;
   representativeDays: number;
   probability: number;
-  weekOptions: number[]; // round-robin assigned to expectedWeek
+  expectedWeek: number; // deterministic per QuickBooks A/R Aging spec
 };
 
+// Per spec:
+//   CURRENT  → 90%, W1
+//   1-30     → 90%, W2
+//   31-60    → 75%, W4
+//   61-90    → 50%, W7
+//   91+      → 20%, W10
 const BUCKETS: Record<BucketKey, BucketDef> = {
-  current:  { key: "current",  label: "Current", representativeDays: 0,   probability: 0.9,  weekOptions: [1, 2] },
-  b1_30:    { key: "b1_30",    label: "1-30",    representativeDays: 15,  probability: 0.9,  weekOptions: [2, 3] },
-  b31_60:   { key: "b31_60",   label: "31-60",   representativeDays: 45,  probability: 0.75, weekOptions: [3, 4, 5] },
-  b61_90:   { key: "b61_90",   label: "61-90",   representativeDays: 75,  probability: 0.5,  weekOptions: [6, 7, 8] },
-  b91_plus: { key: "b91_plus", label: "91+",     representativeDays: 120, probability: 0.2,  weekOptions: [9, 10] },
+  current:  { key: "current",  label: "Current", representativeDays: 0,   probability: 0.9,  expectedWeek: 1 },
+  b1_30:    { key: "b1_30",    label: "1-30",    representativeDays: 15,  probability: 0.9,  expectedWeek: 2 },
+  b31_60:   { key: "b31_60",   label: "31-60",   representativeDays: 45,  probability: 0.75, expectedWeek: 4 },
+  b61_90:   { key: "b61_90",   label: "61-90",   representativeDays: 75,  probability: 0.5,  expectedWeek: 7 },
+  b91_plus: { key: "b91_plus", label: "91+",     representativeDays: 120, probability: 0.2,  expectedWeek: 10 },
 };
 
 export const probabilityForAging = (days: number): number => {
@@ -167,6 +173,17 @@ const detectHeader = (lines: string[]): HeaderInfo | null => {
       }
     });
 
+    // QuickBooks A/R Aging Summary often leaves the customer header cell blank.
+    // If we found aging buckets but no customer column, assume column 0.
+    if (customerCol === -1 && Object.keys(bucketCols).length >= 2) {
+      const firstBucketCol = Math.min(
+        ...(Object.values(bucketCols) as number[]),
+      );
+      if (firstBucketCol > 0) {
+        customerCol = 0;
+      }
+    }
+
     // Accept the row if we found a customer column AND at least one aging bucket.
     if (customerCol !== -1 && Object.keys(bucketCols).length >= 1) {
       return { rowIndex: i, customerCol, bucketCols, totalCol };
@@ -185,7 +202,15 @@ const subDays = (iso: string, days: number) => {
   return d.toISOString().slice(0, 10);
 };
 
-export const parseArCsv = (rawText: string): ParsedArRow[] => {
+export type ParseArCsvOptions = {
+  /** Days to shift expected collection weeks (from assumptions.ar_delay_days). */
+  arDelayDays?: number;
+};
+
+export const parseArCsv = (
+  rawText: string,
+  options: ParseArCsvOptions = {},
+): ParsedArRow[] => {
   if (!rawText || !rawText.trim()) {
     throw new ArCsvParseError("The file is empty.");
   }
@@ -203,9 +228,8 @@ export const parseArCsv = (rawText: string): ParsedArRow[] => {
   }
 
   const today = todayIso();
-  const counters: Record<BucketKey, number> = {
-    current: 0, b1_30: 0, b31_60: 0, b61_90: 0, b91_plus: 0,
-  };
+  const arDelayDays = Math.max(0, options.arDelayDays ?? 0);
+  const arDelayWeeks = Math.round(arDelayDays / 7);
 
   const out: ParsedArRow[] = [];
 
@@ -228,8 +252,7 @@ export const parseArCsv = (rawText: string): ParsedArRow[] => {
       if (!amount) return;
 
       const def = BUCKETS[key];
-      const weekIdx = counters[key] % def.weekOptions.length;
-      counters[key] += 1;
+      const expectedWeek = Math.min(13, Math.max(1, def.expectedWeek + arDelayWeeks));
 
       out.push({
         customer: customerRaw,
@@ -238,7 +261,7 @@ export const parseArCsv = (rawText: string): ParsedArRow[] => {
         agingDays: def.representativeDays,
         invoiceDate: subDays(today, def.representativeDays),
         probability: def.probability,
-        expectedWeek: def.weekOptions[weekIdx],
+        expectedWeek,
         bucketLabel: def.label,
       });
     });
