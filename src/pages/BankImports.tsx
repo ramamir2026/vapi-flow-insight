@@ -300,10 +300,10 @@ const BankImports = () => {
                     return (
                       <TableRow
                         key={r.id}
-                        className={cn(isUnmatched && "bg-amber-500/5", isSweep && "opacity-60")}
+                        className={cn(isUnmatched && warnBg, isSweep && "opacity-60")}
                       >
                         <TableCell className="text-muted-foreground">
-                          {isUnmatched && <AlertCircle className="h-4 w-4 text-amber-500" />}
+                          {isUnmatched && <AlertCircle className={cn("h-4 w-4", warnText)} />}
                         </TableCell>
                         <TableCell className="whitespace-nowrap text-sm tabular-nums text-muted-foreground">
                           {format(new Date(r.date), "MMM d")}
