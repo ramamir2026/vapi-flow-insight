@@ -4,8 +4,6 @@ import { format } from "date-fns";
 import {
   AlertTriangle,
   CheckCircle2,
-  ChevronDown,
-  ChevronUp,
   Circle,
   ExternalLink,
   ListChecks,
@@ -13,7 +11,6 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { useToggleChecklistItem, useWeeklyChecklist } from "@/hooks/useBankData";
 import { useLatestForecastAt } from "@/hooks/useFinanceData";
 import { useOpenAlerts } from "@/hooks/useAlerts";
@@ -101,6 +98,7 @@ const mondayOf = (d: Date): string => {
 };
 
 const STALE_MS = 6 * 24 * 60 * 60 * 1000;
+const COMPLETED_LS_KEY = "checklist_completed_week";
 
 export const MondayChecklist = () => {
   const { user } = useAuth();
@@ -114,6 +112,23 @@ export const MondayChecklist = () => {
   const stale =
     !lastForecastAt || Date.now() - lastForecastAt.getTime() > STALE_MS;
   const shouldShow = isMonday || stale;
+
+  // Check completion flag in localStorage. If the stored Monday matches this
+  // week's Monday, the checklist stays hidden until next Monday. If it's an
+  // older date, clear it so this week's checklist shows again.
+  const [completedWeek, setCompletedWeek] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const stored = window.localStorage.getItem(COMPLETED_LS_KEY);
+      if (!stored) return null;
+      if (stored === week) return stored;
+      // Stale flag from a previous week — clear it.
+      window.localStorage.removeItem(COMPLETED_LS_KEY);
+      return null;
+    } catch {
+      return null;
+    }
+  });
 
   const hasCriticalAlerts = openAlerts.some((a) => a.severity === "critical");
   const activeItems = useMemo(
@@ -159,9 +174,23 @@ export const MondayChecklist = () => {
   const total = activeItems.length;
   const allDone = completedCount === total;
 
-  const [manuallyExpanded, setManuallyExpanded] = useState(false);
+  // Persist completion flag the moment all items are checked.
+  useEffect(() => {
+    if (allDone && completedWeek !== week) {
+      try {
+        window.localStorage.setItem(COMPLETED_LS_KEY, week);
+      } catch {
+        // ignore
+      }
+      setCompletedWeek(week);
+    }
+  }, [allDone, completedWeek, week]);
+
+  // Hide entirely on page load if this week was already completed.
+  if (completedWeek === week && !allDone) return null;
 
   if (!shouldShow) return null;
+
 
   const handleToggle = (key: string, next: boolean) => {
     // Optimistic local update so UX feels instant even if the server is slow.
@@ -174,24 +203,17 @@ export const MondayChecklist = () => {
     });
   };
 
-  // Collapsed success state.
-  if (allDone && !manuallyExpanded) {
+  // Collapsed success banner — shown immediately on completion. On the next
+  // page load the checklist is hidden entirely (handled above) until the
+  // following Monday at midnight.
+  if (allDone) {
     return (
       <Card className="border-[hsl(var(--success))]/40 bg-[hsl(var(--success))]/5">
-        <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
-          <div className="flex items-center gap-2 text-sm font-medium text-[hsl(var(--success))]">
-            <CheckCircle2 className="h-5 w-5" />
+        <CardContent className="flex flex-wrap items-center gap-3 p-4">
+          <CheckCircle2 className="h-5 w-5 text-[hsl(var(--success))]" />
+          <span className="text-sm font-medium text-[hsl(var(--success))]">
             Model updated — Week of {format(new Date(week), "MMM d, yyyy")}
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setManuallyExpanded(true)}
-            className="text-[hsl(var(--success))] hover:text-[hsl(var(--success))]"
-          >
-            <ChevronDown className="mr-1 h-4 w-4" />
-            Show checklist
-          </Button>
+          </span>
         </CardContent>
       </Card>
     );
@@ -211,16 +233,6 @@ export const MondayChecklist = () => {
           <span className="text-xs text-muted-foreground">
             {completedCount} / {total}
           </span>
-          {allDone && manuallyExpanded && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setManuallyExpanded(false)}
-            >
-              <ChevronUp className="mr-1 h-4 w-4" />
-              Collapse
-            </Button>
-          )}
         </div>
       </CardHeader>
       <CardContent className="space-y-1">
