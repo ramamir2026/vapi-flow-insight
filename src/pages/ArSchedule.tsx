@@ -137,7 +137,7 @@ const ArSchedule = () => {
 
   const handleCsv = (text: string, fileName: string) => {
     try {
-      const rows = parseArCsv(text);
+      const rows = parseArCsv(text, { arDelayDays });
       setPreviewRows(rows);
       setPreviewFile(fileName);
       setPreviewOpen(true);
