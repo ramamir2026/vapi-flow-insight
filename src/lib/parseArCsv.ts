@@ -173,6 +173,17 @@ const detectHeader = (lines: string[]): HeaderInfo | null => {
       }
     });
 
+    // QuickBooks A/R Aging Summary often leaves the customer header cell blank.
+    // If we found aging buckets but no customer column, assume column 0.
+    if (customerCol === -1 && Object.keys(bucketCols).length >= 2) {
+      const firstBucketCol = Math.min(
+        ...(Object.values(bucketCols) as number[]),
+      );
+      if (firstBucketCol > 0) {
+        customerCol = 0;
+      }
+    }
+
     // Accept the row if we found a customer column AND at least one aging bucket.
     if (customerCol !== -1 && Object.keys(bucketCols).length >= 1) {
       return { rowIndex: i, customerCol, bucketCols, totalCol };
@@ -191,7 +202,15 @@ const subDays = (iso: string, days: number) => {
   return d.toISOString().slice(0, 10);
 };
 
-export const parseArCsv = (rawText: string): ParsedArRow[] => {
+export type ParseArCsvOptions = {
+  /** Days to shift expected collection weeks (from assumptions.ar_delay_days). */
+  arDelayDays?: number;
+};
+
+export const parseArCsv = (
+  rawText: string,
+  options: ParseArCsvOptions = {},
+): ParsedArRow[] => {
   if (!rawText || !rawText.trim()) {
     throw new ArCsvParseError("The file is empty.");
   }
@@ -209,9 +228,8 @@ export const parseArCsv = (rawText: string): ParsedArRow[] => {
   }
 
   const today = todayIso();
-  const counters: Record<BucketKey, number> = {
-    current: 0, b1_30: 0, b31_60: 0, b61_90: 0, b91_plus: 0,
-  };
+  const arDelayDays = Math.max(0, options.arDelayDays ?? 0);
+  const arDelayWeeks = Math.round(arDelayDays / 7);
 
   const out: ParsedArRow[] = [];
 
@@ -234,8 +252,7 @@ export const parseArCsv = (rawText: string): ParsedArRow[] => {
       if (!amount) return;
 
       const def = BUCKETS[key];
-      const weekIdx = counters[key] % def.weekOptions.length;
-      counters[key] += 1;
+      const expectedWeek = Math.min(13, Math.max(1, def.expectedWeek + arDelayWeeks));
 
       out.push({
         customer: customerRaw,
@@ -244,7 +261,7 @@ export const parseArCsv = (rawText: string): ParsedArRow[] => {
         agingDays: def.representativeDays,
         invoiceDate: subDays(today, def.representativeDays),
         probability: def.probability,
-        expectedWeek: def.weekOptions[weekIdx],
+        expectedWeek,
         bucketLabel: def.label,
       });
     });
