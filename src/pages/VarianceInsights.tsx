@@ -7,6 +7,7 @@ import { generateInsights, joinWeeks } from "@/lib/varianceAnalysis";
 import { WeeklyVarianceTable } from "@/components/variance/WeeklyVarianceTable";
 import { TrendCharts } from "@/components/variance/TrendCharts";
 import { InsightsPanel } from "@/components/variance/InsightsPanel";
+import { CashInOutChart } from "@/components/variance/CashInOutChart";
 
 const VarianceInsights = () => {
   const snap = useLatestSnapshotWeeks();
@@ -50,6 +51,12 @@ const VarianceInsights = () => {
           {snap.data.label ? ` · snapshot: ${snap.data.label}` : ""}.
         </p>
       </div>
+
+      {joined.length > 0 && (
+        <section>
+          <CashInOutChart weeks={joined} />
+        </section>
+      )}
 
       <section className="space-y-2">
         <h2 className="text-sm font-semibold text-foreground">Weekly variance</h2>
