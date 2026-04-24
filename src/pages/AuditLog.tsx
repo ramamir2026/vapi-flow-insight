@@ -21,6 +21,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuditLog, useAuditUsers, type AuditEntry } from "@/hooks/useControls";
 
 const TABLES = ["assumptions", "ar_entries", "future_hires", "weekly_actuals", "model_weeks"];
@@ -75,13 +76,21 @@ export default function AuditLog() {
   const pages = Math.max(1, Math.ceil(total / 50));
 
   const handleExport = async () => {
-    // Pull all rows matching the current filters (cap at 5k for safety)
-    const exportFilters = { ...filters, page: 0, pageSize: 5000 };
-    const { rows: all } = (await (await import("@/hooks/useControls")).useAuditLog) // not callable
-      ? { rows: [] as AuditEntry[] }
-      : { rows: [] as AuditEntry[] };
-    // Fallback: just use what's currently loaded
-    const data = rows.length ? rows : all;
+    let q = supabase
+      .from("audit_log")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(5000);
+    if (filters.user) q = q.eq("user_email", filters.user);
+    if (filters.table?.length) q = q.in("table_name", filters.table);
+    if (filters.action?.length) q = q.in("action", filters.action);
+    if (filters.startDate) q = q.gte("created_at", filters.startDate);
+    if (filters.endDate) q = q.lte("created_at", filters.endDate);
+    const { data: all, error } = await q;
+    if (error) {
+      return;
+    }
+    const data = (all ?? []) as AuditEntry[];
     const aoa = [
       ["Timestamp", "User", "Action", "Table", "Row ID", "Field", "Old", "New", "Source", "Import filename"],
       ...data.map((r) => [
