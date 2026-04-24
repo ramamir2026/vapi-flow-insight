@@ -8,6 +8,7 @@ import {
   LogOut,
   Wallet,
   ScrollText,
+  ShieldCheck,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useCurrentRole } from "@/hooks/useControls";
@@ -15,13 +16,14 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
-const navItems = [
+const baseNavItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
   { to: "/assumptions", label: "Assumptions", icon: Settings2 },
   { to: "/ar-schedule", label: "A/R Schedule", icon: Receipt },
   { to: "/future-hires", label: "Future Hires", icon: UserPlus },
   { to: "/audit-log", label: "Audit Log", icon: ScrollText },
 ];
+const adminNavItem = { to: "/admin-settings", label: "Admin Settings", icon: ShieldCheck };
 
 const ROLE_LABEL: Record<string, string> = {
   approver: "Approver",
@@ -39,6 +41,7 @@ export const AppLayout = ({ children }: { children: ReactNode }) => {
   const { user, signOut } = useAuth();
   const location = useLocation();
   const { data: role } = useCurrentRole();
+  const navItems = role === "approver" ? [...baseNavItems, adminNavItem] : baseNavItems;
   const currentPage = navItems.find((n) => n.to === location.pathname)?.label ?? "Dashboard";
 
   return (
