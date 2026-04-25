@@ -187,7 +187,7 @@ async function markChecklistAuto(
         completed_by_email: "system@auto",
         completed_at: new Date().toISOString(),
       })
-      .eq("id", existing.id);
+      .eq("id", (existing as { id: string }).id);
   } else {
     await supabase.from("weekly_checklist").insert({
       week_start_date: week,
@@ -218,7 +218,7 @@ async function buildContext(
       .select("*")
       .eq("snapshot_id", latestSnap.snapshot_id)
       .order("week_start_date");
-    modelWeeks = (data ?? []) as ModelWeekRow[];
+    modelWeeks = (data ?? []) as unknown as ModelWeekRow[];
   }
 
   // Actuals
