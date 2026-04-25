@@ -78,8 +78,11 @@ interface ReportContext {
   aiFallback: boolean;
 }
 
+// deno-lint-ignore no-explicit-any
+type Sb = any;
+
 async function generateForecastSnapshot(
-  supabase: ReturnType<typeof createClient>,
+  supabase: Sb,
 ): Promise<{ snapshotId: string; weeks: ForecastWeek[]; label: string } | null> {
   const [
     { data: assumptionsRows },
@@ -166,7 +169,7 @@ async function generateForecastSnapshot(
 }
 
 async function markChecklistAuto(
-  supabase: ReturnType<typeof createClient>,
+  supabase: Sb,
   week: string,
 ) {
   // Idempotent upsert
@@ -197,7 +200,7 @@ async function markChecklistAuto(
 }
 
 async function buildContext(
-  supabase: ReturnType<typeof createClient>,
+  supabase: Sb,
   forecast: ForecastWeek[] | null,
 ): Promise<ReportContext> {
   // Pull all model_weeks for the latest snapshot we just wrote (or fall back)
