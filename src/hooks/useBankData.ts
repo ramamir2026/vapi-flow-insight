@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { BankSource, ParsedTxn } from "@/lib/bankParsers/types";
+import { getCurrentMondayKey } from "@/lib/weekKey";
 
 // ============ Bank transactions ============
 export type BankTransaction = {
@@ -273,9 +274,8 @@ export const useToggleChecklistItem = () => {
   });
 };
 
-// Monday of the current local week (YYYY-MM-DD). Uses local-time parts to
-// avoid the UTC shift that would push US users back to Sunday.
-import { getCurrentMondayKey } from "@/lib/weekKey";
+// Monday of the current local week (YYYY-MM-DD). Local-time only — UTC would
+// shift US users back to Sunday early Monday morning.
 const mondayOfThisWeek = (): string => getCurrentMondayKey();
 
 /**
