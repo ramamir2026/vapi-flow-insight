@@ -93,7 +93,7 @@ export default function AuditLog() {
     }
     const data = (all ?? []) as AuditEntry[];
     const aoa = [
-      ["Timestamp", "User", "Action", "Table", "Row ID", "Field", "Old", "New", "Source", "Import filename"],
+      ["Timestamp", "User", "Action", "Table", "Row ID", "Field", "Old Value", "New Value", "Source"],
       ...data.map((r) => [
         r.created_at,
         r.user_email ?? "",
@@ -104,7 +104,6 @@ export default function AuditLog() {
         truncate(r.old_value, 200),
         truncate(r.new_value, 200),
         r.source,
-        r.import_filename ?? "",
       ]),
     ];
     const ws = XLSX.utils.aoa_to_sheet(aoa);
