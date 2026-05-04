@@ -340,6 +340,16 @@ export default function Dashboard() {
         }
         onUnsign={(iso) => unsign.mutate(iso)}
       />
+
+      <ImportActualsDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        weekStart={actualsData?.weekStart ?? ""}
+        initialMap={actualsData?.map ?? {}}
+        initialClosingBalance={actualsData?.closing ?? 0}
+        cogsLabels={forecast.cogsRows.map((r) => ({ key: r.key, label: r.label }))}
+        opexLabels={forecast.opexRows.map((r) => ({ key: r.key, label: r.label }))}
+      />
     </div>
   );
 }
