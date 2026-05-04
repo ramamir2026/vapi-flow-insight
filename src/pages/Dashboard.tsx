@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { ArrowDownRight, ArrowUpRight, Calendar, Download, Flame, RefreshCw, Wallet } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, Calendar, Download, Flame, RefreshCw, Upload, Wallet } from "lucide-react";
+import { ImportActualsDialog } from "@/components/dashboard/ImportActualsDialog";
 import {
   useArEntries,
   useArWeeklyOverride,
@@ -89,6 +90,7 @@ export default function Dashboard() {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const generateBtnRef = useRef<HTMLButtonElement>(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   // Briefly highlight the Generate Forecast button when arriving with ?focus=generate.
   useEffect(() => {
@@ -273,6 +275,10 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => setImportOpen(true)}>
+            <Upload className="h-4 w-4 mr-2" />
+            Import Actuals
+          </Button>
           <Button variant="outline" onClick={handleDownload}>
             <Download className="h-4 w-4 mr-2" />
             Download Excel
@@ -333,6 +339,16 @@ export default function Dashboard() {
           })
         }
         onUnsign={(iso) => unsign.mutate(iso)}
+      />
+
+      <ImportActualsDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        weekStart={actualsData?.weekStart ?? ""}
+        initialMap={actualsData?.map ?? {}}
+        initialClosingBalance={actualsData?.closing ?? 0}
+        cogsLabels={forecast.cogsRows.map((r) => ({ key: r.key, label: r.label }))}
+        opexLabels={forecast.opexRows.map((r) => ({ key: r.key, label: r.label }))}
       />
     </div>
   );
