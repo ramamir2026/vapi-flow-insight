@@ -33,8 +33,10 @@ const BASE_ITEMS: ChecklistItemDef[] = [
     hint: "Brex → Transactions → Export. Re-uploading is safe; duplicates are ignored.",
   },
   { key: "dl_brex_treasury", label: "Download Brex Treasury transactions CSV — last 90 days" },
+  { key: "dl_ramp_checking", label: "Download Ramp Checking transactions CSV — last 90 days" },
+  { key: "dl_ramp_treasury", label: "Download Ramp Treasury transactions CSV — last 90 days" },
   { key: "dl_svb_checking", label: "Download SVB Analysis Checking transactions CSV — last 90 days" },
-  { key: "dl_statements", label: "Download most recent monthly statements for all 5 accounts" },
+  { key: "dl_statements", label: "Download most recent monthly statements for all accounts" },
   {
     key: "upload_txns",
     label: "Upload all transaction CSVs → Bank Imports (auto-detected)",
