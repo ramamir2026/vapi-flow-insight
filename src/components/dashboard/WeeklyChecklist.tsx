@@ -12,8 +12,10 @@ import { cn } from "@/lib/utils";
 const CHECKLIST_ITEMS = [
   { key: "dl_brex_primary", label: "Download Brex Primary transactions CSV — last 90 days" },
   { key: "dl_brex_treasury", label: "Download Brex Treasury transactions CSV — last 90 days" },
+  { key: "dl_ramp_checking", label: "Download Ramp Checking transactions CSV — last 90 days" },
+  { key: "dl_ramp_treasury", label: "Download Ramp Treasury transactions CSV — last 90 days" },
   { key: "dl_svb_checking", label: "Download SVB Analysis Checking transactions CSV — last 90 days" },
-  { key: "dl_statements", label: "Download most recent monthly statements for all 5 accounts" },
+  { key: "dl_statements", label: "Download most recent monthly statements for all accounts" },
   { key: "upload_txns", label: "Upload all transaction CSVs → Bank Imports (auto-detected, duplicate-safe)" },
   { key: "upload_statements", label: "Upload statements → Bank Imports → confirm opening balances match" },
   { key: "dl_qb_ar", label: "Download QuickBooks A/R Aging Summary CSV → upload to A/R Schedule" },
