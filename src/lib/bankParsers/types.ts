@@ -7,7 +7,9 @@ export type BankSource =
   | "brex_card"
   | "svb_checking"
   | "svb_money_market"
-  | "stripe";
+  | "stripe"
+  | "ramp_checking"
+  | "ramp_treasury";
 
 export const BANK_LABEL: Record<BankSource, string> = {
   brex_primary: "Brex Primary",
@@ -17,6 +19,8 @@ export const BANK_LABEL: Record<BankSource, string> = {
   svb_checking: "SVB Analysis Checking",
   svb_money_market: "SVB Money Market",
   stripe: "Stripe",
+  ramp_checking: "Ramp Checking",
+  ramp_treasury: "Ramp Treasury",
 };
 
 // Maps each bank source to the assumption key that holds its opening cash balance.
@@ -31,6 +35,8 @@ export const BANK_TO_ASSUMPTION_KEY: Record<Exclude<BankSource, "brex_card">, st
   svb_checking: "cash_svb_checking",
   svb_money_market: "cash_svb_mm",
   stripe: "cash_stripe_clearing",
+  ramp_checking: "cash_ramp_checking",
+  ramp_treasury: "cash_ramp_treasury",
 };
 
 export type ParsedTxn = {

@@ -16,6 +16,8 @@ import {
 
 const filenameHint = (filename: string): BankSource | null => {
   const f = filename.toLowerCase();
+  if (f.includes("ramp") && f.includes("treasury")) return "ramp_treasury";
+  if (f.includes("ramp")) return "ramp_checking";
   if (f.includes("treasury")) return "brex_treasury";
   if (
     f.includes("stripe_clearing") ||
