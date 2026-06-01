@@ -34,6 +34,8 @@ import { useCreateAlerts, useSaveVarianceSnapshots } from "@/hooks/useAlerts";
 import { detectAlerts, type VarianceTxn } from "@/lib/variance";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { useAccounts } from "@/hooks/useAccounts";
+import { activeSpendableCashKeys } from "@/lib/accounts";
 
 const Kpi = ({
   label,
@@ -88,6 +90,11 @@ export default function Dashboard() {
   const saveVarianceSnapshots = useSaveVarianceSnapshots();
   const autoCheck = useAutoCheckChecklistItem();
   const { user } = useAuth();
+  const { data: accounts } = useAccounts();
+  const activeCashKeys = useMemo(
+    () => (accounts ? activeSpendableCashKeys(accounts) : []),
+    [accounts],
+  );
   const [searchParams] = useSearchParams();
   const generateBtnRef = useRef<HTMLButtonElement>(null);
   const [importOpen, setImportOpen] = useState(false);
@@ -130,9 +137,10 @@ export default function Dashboard() {
       13,
       undefined,
       arOverride ? { weeks: arOverride.weeks, delay_days: arOverride.delay_days } : null,
-      hireOverride ? { weeks: hireOverride.weeks } : null
+      hireOverride ? { weeks: hireOverride.weeks } : null,
+      activeCashKeys,
     );
-  }, [assumptions, arEntries, hires, arOverride, hireOverride]);
+  }, [assumptions, arEntries, hires, arOverride, hireOverride, activeCashKeys]);
 
   if (loading || !forecast) {
     return (

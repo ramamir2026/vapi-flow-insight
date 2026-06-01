@@ -36,6 +36,8 @@ import {
 import { priorFridayISO } from "@/lib/bankParsers/deriveBalance";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { useAccounts } from "@/hooks/useAccounts";
+import { ASSUMPTION_KEY_TO_BANK_SOURCE } from "@/lib/accounts";
 
 // Confidence string → numeric score. ≥ 0.8 auto-accepts.
 export const CONFIDENCE_SCORE: Record<"high" | "medium" | "low", number> = {
@@ -46,18 +48,8 @@ export const CONFIDENCE_SCORE: Record<"high" | "medium" | "low", number> = {
 
 const AUTO_ACCEPT_THRESHOLD = 0.8;
 
-// Required for a full snapshot of spendable cash. Collateral is intentionally
-// NOT required — it's restricted and excluded from spendable cash.
-const REQUIRED_SOURCES: BankSource[] = [
-  "brex_primary",
-  "brex_treasury",
-  "brex_stripe_clearing",
-  "svb_checking",
-  "svb_money_market",
-  "ramp_checking",
-  "ramp_treasury",
-];
-
+// Required/restricted sets are now derived from the accounts registry at
+// render time (see component body), not hardcoded.
 const ALL_SOURCES: BankSource[] = [
   "brex_primary",
   "brex_treasury",
@@ -70,12 +62,6 @@ const ALL_SOURCES: BankSource[] = [
   "ramp_checking",
   "ramp_treasury",
 ];
-
-// Accounts whose balance is restricted (held as collateral) and therefore
-// excluded from the spendable opening-cash sum in the forecast.
-export const RESTRICTED_SOURCES: ReadonlySet<BankSource> = new Set<BankSource>([
-  "svb_collateral",
-]);
 
 const FILE_TYPE_LABEL: Record<BankSource, string> = {
   brex_primary: "Brex CSV",
@@ -123,6 +109,28 @@ export const BatchDetectCard = ({ onImportFile, disabled }: BatchDetectCardProps
   const [files, setFiles] = useState<StagedFile[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const [importing, setImporting] = useState(false);
+  const { data: accounts } = useAccounts();
+
+  // Required & restricted sources derived live from the accounts registry —
+  // adding/removing an account row in the DB is the only thing needed to change
+  // these. No code changes required.
+  const requiredSources = useMemo<BankSource[]>(() => {
+    if (!accounts?.length) return [];
+    return accounts
+      .filter((a) => a.is_active && !a.is_restricted)
+      .map((a) => ASSUMPTION_KEY_TO_BANK_SOURCE[a.assumption_key])
+      .filter((s): s is BankSource => Boolean(s));
+  }, [accounts]);
+  const restrictedSources = useMemo<ReadonlySet<BankSource>>(() => {
+    const set = new Set<BankSource>();
+    for (const a of accounts ?? []) {
+      if (a.is_active && a.is_restricted) {
+        const src = ASSUMPTION_KEY_TO_BANK_SOURCE[a.assumption_key];
+        if (src) set.add(src);
+      }
+    }
+    return set;
+  }, [accounts]);
 
   const handleFiles = useCallback(async (list: FileList | File[]) => {
     const arr = Array.from(list);
@@ -144,7 +152,7 @@ export const BatchDetectCard = ({ onImportFile, disabled }: BatchDetectCardProps
         toast.error(`${file.name}: could not read file.`);
         continue;
       }
-      const result = detectAndParse(text, file.name);
+      const result = detectAndParse(text, file.name, accounts);
       const score = CONFIDENCE_SCORE[result.confidence];
       staged.push({
         id: `${file.name}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -167,7 +175,7 @@ export const BatchDetectCard = ({ onImportFile, disabled }: BatchDetectCardProps
         `Staged ${staged.length} file${staged.length === 1 ? "" : "s"}. ${auto} auto-accepted (≥ 0.8 confidence).`
       );
     }
-  }, []);
+  }, [accounts]);
 
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault();
@@ -203,7 +211,7 @@ export const BatchDetectCard = ({ onImportFile, disabled }: BatchDetectCardProps
     for (const s of mappedSources) counts.set(s, (counts.get(s) ?? 0) + 1);
     const duplicates: BankSource[] = [];
     for (const [src, n] of counts) if (n > 1) duplicates.push(src);
-    const missing = REQUIRED_SOURCES.filter((src) => !counts.has(src));
+    const missing = requiredSources.filter((src) => !counts.has(src));
     return { duplicates, missing, confirmedCount: confirmed.length };
   }, [files]);
 
@@ -282,7 +290,7 @@ export const BatchDetectCard = ({ onImportFile, disabled }: BatchDetectCardProps
                 </TableHeader>
                 <TableBody>
                   {files.map((f) => {
-                    const isRestricted = RESTRICTED_SOURCES.has(f.overrideSource);
+                    const isRestricted = restrictedSources.has(f.overrideSource);
                     const isDuplicate =
                       f.confirmed &&
                       completeness.duplicates.includes(f.overrideSource);
@@ -318,7 +326,7 @@ export const BatchDetectCard = ({ onImportFile, disabled }: BatchDetectCardProps
                                 {ALL_SOURCES.map((b) => (
                                   <SelectItem key={b} value={b} className="text-xs">
                                     {BANK_LABEL[b]}
-                                    {RESTRICTED_SOURCES.has(b) ? " — restricted" : ""}
+                                    {restrictedSources.has(b) ? " — restricted" : ""}
                                   </SelectItem>
                                 ))}
                               </SelectContent>

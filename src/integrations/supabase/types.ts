@@ -14,6 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      accounts: {
+        Row: {
+          assumption_key: string
+          created_at: string
+          detection_signature: Json
+          id: string
+          institution: string
+          is_active: boolean
+          is_restricted: boolean
+          label: string
+          last4: string | null
+          parser_type: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          assumption_key: string
+          created_at?: string
+          detection_signature?: Json
+          id?: string
+          institution: string
+          is_active?: boolean
+          is_restricted?: boolean
+          label: string
+          last4?: string | null
+          parser_type: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          assumption_key?: string
+          created_at?: string
+          detection_signature?: Json
+          id?: string
+          institution?: string
+          is_active?: boolean
+          is_restricted?: boolean
+          label?: string
+          last4?: string | null
+          parser_type?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       ai_analyses: {
         Row: {
           analysis_text: string

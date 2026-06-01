@@ -30,6 +30,37 @@ import {
   normalizeText,
   splitCsvLine,
 } from "./types";
+import {
+  ASSUMPTION_KEY_TO_BANK_SOURCE,
+  type AccountRow,
+} from "@/lib/accounts";
+
+// Build identifier → BankSource maps from the accounts registry. Empty
+// registry (e.g. unit tests) falls back to legacy hardcoded behaviour below.
+const buildRegistryMaps = (accounts: AccountRow[] | undefined) => {
+  const brex: Record<string, BankSource> = {};
+  const svb: Array<{ suffix: string; source: BankSource }> = [];
+  for (const a of accounts ?? []) {
+    if (!a.is_active) continue;
+    const src = ASSUMPTION_KEY_TO_BANK_SOURCE[a.assumption_key];
+    if (!src) continue;
+    const ident = (a.detection_signature?.account_value ?? a.last4 ?? "").replace(/\D/g, "");
+    if (!ident) continue;
+    if (a.parser_type === "brex") brex[ident.slice(-4)] = src;
+    if (a.parser_type === "svb_bai") svb.push({ suffix: ident, source: src });
+  }
+  return { brex, svb };
+};
+
+const LEGACY_BREX_LAST4: Record<string, BankSource> = {
+  "8083": "brex_primary",
+  "2515": "brex_treasury",
+  "9173": "brex_stripe_clearing",
+};
+const LEGACY_SVB: Array<{ suffix: string; source: BankSource }> = [
+  { suffix: "4687", source: "svb_checking" },
+  { suffix: "0999", source: "svb_collateral" },
+];
 
 // -------------------- filename fallback (last resort) --------------------
 const filenameHint = (filename: string): BankSource | null => {
@@ -172,30 +203,34 @@ const valueByToken = (
 
 const onlyDigits = (s: string) => s.replace(/\D/g, "");
 
-// -------------------- account → source maps --------------------
-const BREX_LAST4: Record<string, BankSource> = {
-  "8083": "brex_primary",
-  "2515": "brex_treasury",
-  "9173": "brex_stripe_clearing",
-};
-
-const resolveSvbBai = (accountNumber: string): BankSource | null => {
+const resolveSvbBai = (
+  accountNumber: string,
+  list: Array<{ suffix: string; source: BankSource }>,
+): BankSource | null => {
   const d = onlyDigits(accountNumber);
   if (!d) return null;
-  if (d.endsWith("4687")) return "svb_checking";
-  if (d.endsWith("0999")) return "svb_collateral";
-  return null;
+  // Prefer the longest matching suffix so e.g. "00004687" beats a shorter "87".
+  const matches = list.filter((e) => d.endsWith(e.suffix));
+  if (!matches.length) return null;
+  matches.sort((a, b) => b.suffix.length - a.suffix.length);
+  return matches[0].source;
 };
 
 // -------------------- main entry --------------------
 export const detectAndParse = (
   rawText: string,
-  filename: string
+  filename: string,
+  accounts?: AccountRow[],
 ): DetectionResult => {
   const text = normalizeText(rawText);
   const hint = filenameHint(filename);
   const warnings: string[] = [];
   const header = findHeader(text);
+  const registry = buildRegistryMaps(accounts);
+  // Fall back to legacy hardcoded mappings only when registry is empty
+  // (keeps unit tests and pre-registry callers working).
+  const brexMap = Object.keys(registry.brex).length ? registry.brex : LEGACY_BREX_LAST4;
+  const svbList = registry.svb.length ? registry.svb : LEGACY_SVB;
 
   if (!header) {
     return {
@@ -224,7 +259,7 @@ export const detectAndParse = (
         ? valueByToken(header.cols, dataRow, ["accountnumberlastfour", "accountlastfour", "last4"])
         : null;
       const last4 = last4Raw ? onlyDigits(last4Raw).slice(-4) : "";
-      const mapped = last4 ? BREX_LAST4[last4] : undefined;
+      const mapped = last4 ? brexMap[last4] : undefined;
       if (mapped) {
         source = mapped;
         confidence = "high";
@@ -240,7 +275,7 @@ export const detectAndParse = (
       const acctRaw = dataRow
         ? valueByToken(header.cols, dataRow, ["accountnumber"])
         : null;
-      const mapped = acctRaw ? resolveSvbBai(acctRaw) : null;
+      const mapped = acctRaw ? resolveSvbBai(acctRaw, svbList) : null;
       if (mapped) {
         source = mapped;
         confidence = "high";
