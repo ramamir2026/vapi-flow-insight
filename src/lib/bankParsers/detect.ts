@@ -25,6 +25,7 @@ import { deriveOpeningBalance } from "./deriveBalance";
 import {
   BankSource,
   DetectionResult,
+  MANUAL_BALANCE_SOURCES,
   norm,
   normalizeText,
   splitCsvLine,
