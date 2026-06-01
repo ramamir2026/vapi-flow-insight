@@ -63,6 +63,8 @@ export interface ForecastResult {
   endingBalance: number;
   cashOutDate: string | null;
   minCashThreshold: number;
+  actualMonthlyBurn: number | null;
+  actualRunwayMonths: number | null;
 }
 
 export const buildAssumptionMap = (
