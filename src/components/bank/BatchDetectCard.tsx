@@ -211,7 +211,7 @@ export const BatchDetectCard = ({ onImportFile, disabled }: BatchDetectCardProps
     for (const s of mappedSources) counts.set(s, (counts.get(s) ?? 0) + 1);
     const duplicates: BankSource[] = [];
     for (const [src, n] of counts) if (n > 1) duplicates.push(src);
-    const missing = REQUIRED_SOURCES.filter((src) => !counts.has(src));
+    const missing = requiredSources.filter((src) => !counts.has(src));
     return { duplicates, missing, confirmedCount: confirmed.length };
   }, [files]);
 
@@ -290,7 +290,7 @@ export const BatchDetectCard = ({ onImportFile, disabled }: BatchDetectCardProps
                 </TableHeader>
                 <TableBody>
                   {files.map((f) => {
-                    const isRestricted = RESTRICTED_SOURCES.has(f.overrideSource);
+                    const isRestricted = restrictedSources.has(f.overrideSource);
                     const isDuplicate =
                       f.confirmed &&
                       completeness.duplicates.includes(f.overrideSource);
@@ -326,7 +326,7 @@ export const BatchDetectCard = ({ onImportFile, disabled }: BatchDetectCardProps
                                 {ALL_SOURCES.map((b) => (
                                   <SelectItem key={b} value={b} className="text-xs">
                                     {BANK_LABEL[b]}
-                                    {RESTRICTED_SOURCES.has(b) ? " — restricted" : ""}
+                                    {restrictedSources.has(b) ? " — restricted" : ""}
                                   </SelectItem>
                                 ))}
                               </SelectContent>
