@@ -152,7 +152,7 @@ export const BatchDetectCard = ({ onImportFile, disabled }: BatchDetectCardProps
         toast.error(`${file.name}: could not read file.`);
         continue;
       }
-      const result = detectAndParse(text, file.name);
+      const result = detectAndParse(text, file.name, accounts);
       const score = CONFIDENCE_SCORE[result.confidence];
       staged.push({
         id: `${file.name}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
