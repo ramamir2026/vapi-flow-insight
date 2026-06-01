@@ -131,6 +131,10 @@ async function generateForecastSnapshot(
       ? { weeks: hireOv.weeks as number[] }
       : null;
 
+  const activeCashKeys = ((accountsRows as Array<{ assumption_key: string; is_active: boolean; is_restricted: boolean }>) ?? [])
+    .filter((a) => a.is_active && !a.is_restricted)
+    .map((a) => a.assumption_key);
+
   const result = buildForecast(
     assumptions,
     (arRows as any[]) ?? [],
@@ -139,6 +143,7 @@ async function generateForecastSnapshot(
     start,
     arOverride,
     hireOverride,
+    activeCashKeys,
   );
 
   const snapshotId = crypto.randomUUID();
