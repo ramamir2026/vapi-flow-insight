@@ -184,6 +184,7 @@ const TransactionImportTab = () => {
   const [warnings, setWarnings] = useState<string[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const importMut = useImportBankTransactions();
+  const uploadStatementMut = useUploadStatement();
   const upsertRule = useUpsertCategoryRule();
   const { data: rules = [] } = useBankCategoryRules();
   const { data: assumptionsList = [] } = useAssumptions();
@@ -347,12 +348,22 @@ const TransactionImportTab = () => {
       <RoleGate role="editor">
         <BatchDetectCard
           disabled={importMut.isPending}
-          onImportFile={async ({ rows, filename, bank_source }) => {
+          onImportFile={async ({ rows, filename, bank_source, derivedBalance, balanceAsOf }) => {
             const withRules = applyRules(
               rows.map((r) => ({ ...r, bank_source })),
               rules
             );
             await importMut.mutateAsync({ rows: withRules, filename });
+            // Record the as-of balance so the Balance Verification banner can
+            // show "balance as of <Friday>" for this account.
+            if (derivedBalance != null && balanceAsOf) {
+              await uploadStatementMut.mutateAsync({
+                bank_source,
+                statement_date: balanceAsOf,
+                closing_balance: derivedBalance,
+                filename,
+              });
+            }
           }}
         />
       </RoleGate>

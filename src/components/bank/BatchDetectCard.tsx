@@ -97,6 +97,8 @@ interface StagedFile {
   warnings: string[];
   rows: ParsedTxn[];
   confirmed: boolean;
+  derivedBalance: number | null;
+  balanceAsOf: string | null;
 }
 
 const warnText = "text-[hsl(var(--warn-amber))]";
@@ -108,6 +110,8 @@ interface BatchDetectCardProps {
     rows: ParsedTxn[];
     filename: string;
     bank_source: BankSource;
+    derivedBalance: number | null;
+    balanceAsOf: string | null;
   }) => Promise<void>;
   disabled?: boolean;
 }
@@ -149,6 +153,8 @@ export const BatchDetectCard = ({ onImportFile, disabled }: BatchDetectCardProps
         warnings: result.warnings,
         rows: result.rows,
         confirmed: score >= AUTO_ACCEPT_THRESHOLD,
+        derivedBalance: result.derivedBalance,
+        balanceAsOf: result.balanceAsOf,
       });
     }
     if (staged.length) {
@@ -212,6 +218,8 @@ export const BatchDetectCard = ({ onImportFile, disabled }: BatchDetectCardProps
           rows: rowsForSource,
           filename: f.filename,
           bank_source: f.overrideSource,
+          derivedBalance: f.derivedBalance,
+          balanceAsOf: f.balanceAsOf,
         });
       }
       toast.success(`Imported ${toImport.length} file${toImport.length === 1 ? "" : "s"}.`);
@@ -264,6 +272,7 @@ export const BatchDetectCard = ({ onImportFile, disabled }: BatchDetectCardProps
                     <TableHead>Mapped account</TableHead>
                     <TableHead className="w-32">Confidence</TableHead>
                     <TableHead className="w-24 text-right">Rows</TableHead>
+                    <TableHead className="w-44 text-right">Balance (as of)</TableHead>
                     <TableHead className="w-20 text-center">Confirm</TableHead>
                     <TableHead className="w-10"></TableHead>
                   </TableRow>
@@ -342,6 +351,24 @@ export const BatchDetectCard = ({ onImportFile, disabled }: BatchDetectCardProps
                         </TableCell>
                         <TableCell className="text-right tabular-nums text-sm text-muted-foreground">
                           {f.rows.length}
+                        </TableCell>
+                        <TableCell className="text-right text-xs tabular-nums">
+                          {f.derivedBalance != null && f.balanceAsOf ? (
+                            <div className="flex flex-col items-end">
+                              <span className="font-medium text-foreground">
+                                {f.derivedBalance.toLocaleString("en-US", {
+                                  style: "currency",
+                                  currency: "USD",
+                                  maximumFractionDigits: 0,
+                                })}
+                              </span>
+                              <span className="text-[10px] text-muted-foreground">
+                                as of {f.balanceAsOf}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
                         </TableCell>
                         <TableCell className="text-center">
                           <Checkbox
