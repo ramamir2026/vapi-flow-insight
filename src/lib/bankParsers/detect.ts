@@ -30,6 +30,37 @@ import {
   normalizeText,
   splitCsvLine,
 } from "./types";
+import {
+  ASSUMPTION_KEY_TO_BANK_SOURCE,
+  type AccountRow,
+} from "@/lib/accounts";
+
+// Build identifier → BankSource maps from the accounts registry. Empty
+// registry (e.g. unit tests) falls back to legacy hardcoded behaviour below.
+const buildRegistryMaps = (accounts: AccountRow[] | undefined) => {
+  const brex: Record<string, BankSource> = {};
+  const svb: Array<{ suffix: string; source: BankSource }> = [];
+  for (const a of accounts ?? []) {
+    if (!a.is_active) continue;
+    const src = ASSUMPTION_KEY_TO_BANK_SOURCE[a.assumption_key];
+    if (!src) continue;
+    const ident = (a.detection_signature?.account_value ?? a.last4 ?? "").replace(/\D/g, "");
+    if (!ident) continue;
+    if (a.parser_type === "brex") brex[ident.slice(-4)] = src;
+    if (a.parser_type === "svb_bai") svb.push({ suffix: ident, source: src });
+  }
+  return { brex, svb };
+};
+
+const LEGACY_BREX_LAST4: Record<string, BankSource> = {
+  "8083": "brex_primary",
+  "2515": "brex_treasury",
+  "9173": "brex_stripe_clearing",
+};
+const LEGACY_SVB: Array<{ suffix: string; source: BankSource }> = [
+  { suffix: "4687", source: "svb_checking" },
+  { suffix: "0999", source: "svb_collateral" },
+];
 
 // -------------------- filename fallback (last resort) --------------------
 const filenameHint = (filename: string): BankSource | null => {
