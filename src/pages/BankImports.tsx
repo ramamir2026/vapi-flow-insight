@@ -97,6 +97,7 @@ const BANK_OPTIONS: BankSource[] = [
   "brex_stripe_clearing",
   "svb_checking",
   "svb_money_market",
+  "svb_collateral",
   "stripe",
   "ramp_checking",
   "ramp_treasury",
