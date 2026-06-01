@@ -90,6 +90,7 @@ async function generateForecastSnapshot(
     { data: hireRows },
     { data: arOverrideRows },
     { data: hireOverrideRows },
+    { data: accountsRows },
   ] = await Promise.all([
     supabase.from("assumptions").select("key, value"),
     supabase.from("ar_entries").select("expected_collection_date, invoice_amount, status"),
@@ -104,6 +105,9 @@ async function generateForecastSnapshot(
       .select("forecast_start, weeks")
       .order("created_at", { ascending: false })
       .limit(1),
+    supabase
+      .from("accounts")
+      .select("assumption_key, is_active, is_restricted"),
   ]);
 
   if (!assumptionsRows) return null;
