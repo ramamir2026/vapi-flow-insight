@@ -206,6 +206,8 @@ export const detectAndParse = (
           ? `No recognizable header found; falling back to filename hint (${hint}).`
           : "Could not find a recognizable header row. Re-export from your bank or remove extra summary rows at the top of the file.",
       ],
+      derivedBalance: null,
+      balanceAsOf: null,
     };
   }
 
