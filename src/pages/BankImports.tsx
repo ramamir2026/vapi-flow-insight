@@ -344,6 +344,21 @@ const TransactionImportTab = () => {
     <div className="space-y-6">
       <TransactionsOnFilePanel />
 
+      <RoleGate role="editor">
+        <BatchDetectCard
+          disabled={importMut.isPending}
+          onImportFile={async ({ rows, filename, bank_source }) => {
+            const withRules = applyRules(
+              rows.map((r) => ({ ...r, bank_source })),
+              rules
+            );
+            await importMut.mutateAsync({ rows: withRules, filename });
+          }}
+        />
+      </RoleGate>
+
+
+
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Upload bank transactions</CardTitle>
