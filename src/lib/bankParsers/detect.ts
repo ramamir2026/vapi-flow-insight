@@ -344,5 +344,19 @@ export const detectAndParse = (
     );
   }
 
-  return { source: source!, confidence, rows: rows!, warnings };
+  const derived = deriveOpeningBalance(rows!);
+  if (rows!.length && !derived) {
+    warnings.push(
+      "No row carries a running balance on or before the prior Friday — opening balance cannot be derived from this file."
+    );
+  }
+
+  return {
+    source: source!,
+    confidence,
+    rows: rows!,
+    warnings,
+    derivedBalance: derived?.balance ?? null,
+    balanceAsOf: derived?.asOf ?? null,
+  };
 };
