@@ -63,6 +63,7 @@ import { useCreateAlerts } from "@/hooks/useAlerts";
 import { detectAlerts, type VarianceTxn } from "@/lib/variance";
 import { toast } from "sonner";
 import { RoleGate } from "@/components/RoleGate";
+import { BatchDetectCard } from "@/components/bank/BatchDetectCard";
 
 type RowState = ParsedTxn & { confirmed: boolean };
 
@@ -97,6 +98,7 @@ const BANK_OPTIONS: BankSource[] = [
   "brex_stripe_clearing",
   "svb_checking",
   "svb_money_market",
+  "svb_collateral",
   "stripe",
   "ramp_checking",
   "ramp_treasury",
@@ -341,6 +343,21 @@ const TransactionImportTab = () => {
   return (
     <div className="space-y-6">
       <TransactionsOnFilePanel />
+
+      <RoleGate role="editor">
+        <BatchDetectCard
+          disabled={importMut.isPending}
+          onImportFile={async ({ rows, filename, bank_source }) => {
+            const withRules = applyRules(
+              rows.map((r) => ({ ...r, bank_source })),
+              rules
+            );
+            await importMut.mutateAsync({ rows: withRules, filename });
+          }}
+        />
+      </RoleGate>
+
+
 
       <Card>
         <CardHeader>
