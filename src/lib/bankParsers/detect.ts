@@ -275,7 +275,7 @@ export const detectAndParse = (
       const acctRaw = dataRow
         ? valueByToken(header.cols, dataRow, ["accountnumber"])
         : null;
-      const mapped = acctRaw ? resolveSvbBai(acctRaw) : null;
+      const mapped = acctRaw ? resolveSvbBai(acctRaw, svbList) : null;
       if (mapped) {
         source = mapped;
         confidence = "high";
