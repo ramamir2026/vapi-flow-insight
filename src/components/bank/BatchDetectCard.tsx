@@ -218,6 +218,8 @@ export const BatchDetectCard = ({ onImportFile, disabled }: BatchDetectCardProps
           rows: rowsForSource,
           filename: f.filename,
           bank_source: f.overrideSource,
+          derivedBalance: f.derivedBalance,
+          balanceAsOf: f.balanceAsOf,
         });
       }
       toast.success(`Imported ${toImport.length} file${toImport.length === 1 ? "" : "s"}.`);
