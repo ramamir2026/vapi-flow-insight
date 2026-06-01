@@ -63,6 +63,7 @@ import { useCreateAlerts } from "@/hooks/useAlerts";
 import { detectAlerts, type VarianceTxn } from "@/lib/variance";
 import { toast } from "sonner";
 import { RoleGate } from "@/components/RoleGate";
+import { BatchDetectCard } from "@/components/bank/BatchDetectCard";
 
 type RowState = ParsedTxn & { confirmed: boolean };
 
