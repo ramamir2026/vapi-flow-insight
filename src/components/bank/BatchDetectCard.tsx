@@ -97,6 +97,8 @@ interface StagedFile {
   warnings: string[];
   rows: ParsedTxn[];
   confirmed: boolean;
+  derivedBalance: number | null;
+  balanceAsOf: string | null;
 }
 
 const warnText = "text-[hsl(var(--warn-amber))]";
@@ -108,6 +110,8 @@ interface BatchDetectCardProps {
     rows: ParsedTxn[];
     filename: string;
     bank_source: BankSource;
+    derivedBalance: number | null;
+    balanceAsOf: string | null;
   }) => Promise<void>;
   disabled?: boolean;
 }
