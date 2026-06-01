@@ -35,9 +35,12 @@ import { detectAndParse } from "@/lib/bankParsers/detect";
 import {
   BANK_LABEL,
   BANK_TO_ASSUMPTION_KEY,
+  MANUAL_BALANCE_SOURCES,
   type BankSource,
   type ParsedTxn,
 } from "@/lib/bankParsers/types";
+import { priorFridayISO } from "@/lib/bankParsers/deriveBalance";
+import { Input } from "@/components/ui/input";
 import {
   extractClosingBalanceFromCsv,
   extractClosingBalanceFromText,
